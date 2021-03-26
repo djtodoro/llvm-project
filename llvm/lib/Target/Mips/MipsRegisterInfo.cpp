@@ -103,6 +103,9 @@ MipsRegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
   if (Subtarget.isSingleFloat())
     return CSR_SingleFloatOnly_SaveList;
 
+  if (Subtarget.isABI_P32())
+    return CSR_P32_SaveList;
+
   if (Subtarget.isABI_N64())
     return CSR_N64_SaveList;
 
@@ -131,6 +134,9 @@ MipsRegisterInfo::getCallPreservedMask(const MachineFunction &MF,
   if (Subtarget.isABI_N32())
     return CSR_N32_RegMask;
 
+  if (Subtarget.isABI_P32())
+    return CSR_P32_RegMask;
+
   if (Subtarget.isFP64bit())
     return CSR_O32_FP64_RegMask;
 
@@ -154,6 +160,10 @@ getReservedRegs(const MachineFunction &MF) const {
     Mips::ZERO_64, Mips::K0_64, Mips::K1_64, Mips::SP_64
   };
 
+  static const MCPhysReg ReservedGPR32NM[] = {
+    Mips::ZERO_NM, Mips::K0_NM, Mips::K1_NM, Mips::SP_NM
+  };
+
   BitVector Reserved(getNumRegs());
   const MipsSubtarget &Subtarget = MF.getSubtarget<MipsSubtarget>();
 
@@ -170,10 +180,14 @@ getReservedRegs(const MachineFunction &MF) const {
   for (MCPhysReg R : ReservedGPR64)
     Reserved.set(R);
 
+  for (MCPhysReg R : ReservedGPR32NM)
+    Reserved.set(R);
+
   // For mno-abicalls, GP is a program invariant!
   if (!Subtarget.isABICalls()) {
     Reserved.set(Mips::GP);
     Reserved.set(Mips::GP_64);
+    Reserved.set(Mips::GP_NM);
   }
 
   if (Subtarget.isFP64bit()) {
@@ -192,6 +206,7 @@ getReservedRegs(const MachineFunction &MF) const {
     else {
       Reserved.set(Mips::FP);
       Reserved.set(Mips::FP_64);
+      Reserved.set(Mips::FP_NM);
 
       // Reserve the base register if we need to both realign the stack and
       // allocate variable-sized objects at runtime. This should test the
@@ -232,6 +247,7 @@ getReservedRegs(const MachineFunction &MF) const {
   if (Subtarget.useSmallSection()) {
     Reserved.set(Mips::GP);
     Reserved.set(Mips::GP_64);
+    Reserved.set(Mips::GP_NM);
   }
 
   return Reserved;
