@@ -342,6 +342,7 @@ std::unique_ptr<TargetInfo> AllocateTarget(const llvm::Triple &Triple,
       return std::make_unique<MipsTargetInfo>(Triple, Opts);
     }
 
+
   case llvm::Triple::m68k:
     switch (os) {
     case llvm::Triple::Linux:
@@ -350,6 +351,15 @@ std::unique_ptr<TargetInfo> AllocateTarget(const llvm::Triple &Triple,
       return std::make_unique<NetBSDTargetInfo<M68kTargetInfo>>(Triple, Opts);
     default:
       return std::make_unique<M68kTargetInfo>(Triple, Opts);
+    }
+
+
+  case llvm::Triple::nanomips:
+    switch (os) {
+    case llvm::Triple::Linux:
+      return new LinuxTargetInfo<MipsTargetInfo>(Triple, Opts);
+    default:
+      return new MipsTargetInfo(Triple, Opts);
     }
 
   case llvm::Triple::ppc:
