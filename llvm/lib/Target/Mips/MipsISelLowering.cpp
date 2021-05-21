@@ -2107,6 +2107,8 @@ SDValue MipsTargetLowering::lowerGlobalAddress(SDValue Op,
                                 : getAddrNonPICSym64(N, SDLoc(N), Ty, DAG);
   }
 
+  assert(!Subtarget.hasNanoMips() && "No nanoMIPS support yet");
+
   // Every other architecture would use shouldAssumeDSOLocal in here, but
   // mips is special.
   // * In PIC code mips requires got loads even for local statics!
@@ -2240,6 +2242,8 @@ lowerJumpTable(SDValue Op, SelectionDAG &DAG) const
     return Subtarget.hasSym32() ? getAddrNonPIC(N, SDLoc(N), Ty, DAG)
                                 : getAddrNonPICSym64(N, SDLoc(N), Ty, DAG);
   }
+
+  assert(!Subtarget.hasNanoMips() && "No nanoMIPS support yet");
 
   return getAddrLocal(N, SDLoc(N), Ty, DAG, ABI.IsN32() || ABI.IsN64());
 }
