@@ -2710,7 +2710,9 @@ SDValue MipsTargetLowering::lowerLOAD(SDValue Op, SelectionDAG &DAG) const {
   if (Subtarget.systemSupportsUnalignedAccess())
     return Op;
 
-  if (Subtarget.hasNanoMips()) {
+  // TODO: This was SD->getAligment(), is it the same?
+  if (Subtarget.hasNanoMips() &&
+      (LD->getAlign().value() < MemVT.getSizeInBits() / 8)) {
     if (MemVT == MVT::i32) {
       SDValue Chain = LD->getChain(), Undef = DAG.getUNDEF(MemVT);
       return createLoadLR(MipsISD::UALW, DAG, LD, Chain, Undef, 0);
@@ -2843,7 +2845,9 @@ SDValue MipsTargetLowering::lowerSTORE(SDValue Op, SelectionDAG &DAG) const {
   StoreSDNode *SD = cast<StoreSDNode>(Op);
   EVT MemVT = SD->getMemoryVT();
 
-  if (Subtarget.hasNanoMips()) {
+  // TODO: This was SD->getAligment(), is it the same?
+  if (Subtarget.hasNanoMips() &&
+      (SD->getAlign().value() < MemVT.getSizeInBits() / 8)) {
     if (MemVT == MVT::i32) {
       SDValue Chain = SD->getChain();
       return createStoreLR(MipsISD::UASW, DAG, SD, Chain, 0);
