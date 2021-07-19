@@ -1,5 +1,8 @@
 ; RUN: %llc_dwarf -O0 -filetype=obj -dwarf-linkage-names=All < %s | llvm-dwarfdump -debug-info - | FileCheck %s
 
+; No object emitter on nanomips
+; UNSUPPORTED: nanomips
+
 ; Generated from clang with the following source:
 ; namespace ns {
 ; void func() {

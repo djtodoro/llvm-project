@@ -1,5 +1,9 @@
 // Check -ftime-report/-ftime-report= output
 // RUN: %clang_cc1 -emit-obj -O1 \
+
+// No object emitter on nanomips
+// UNSUPPORTED: nanomips
+
 // RUN:     -ftime-report %s -o /dev/null 2>&1 | \
 // RUN:     FileCheck %s --check-prefixes=TIME,NPM
 // RUN: %clang_cc1 -emit-obj -O1 \

@@ -1,5 +1,8 @@
 ; RUN: %llc_dwarf -O0 -filetype=obj < %s | llvm-dwarfdump -debug-info - | FileCheck %s
 
+; No object emitter on nanomips
+; UNSUPPORTED: nanomips
+
 ; CHECK: DW_TAG_subprogram
 ; CHECK:   DW_AT_name ("f")
 ; CHECK-NOT: DW_TAG

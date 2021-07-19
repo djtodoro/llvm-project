@@ -1,4 +1,8 @@
 // UNSUPPORTED: target={{.*}}-zos{{.*}}, target={{.*}}-aix{{.*}}
+
+// No object emitter on nanomips
+// UNSUPPORTED: nanomips
+
 @import DependsOnModule;
 
 // RUN: rm -rf %t %t-obj

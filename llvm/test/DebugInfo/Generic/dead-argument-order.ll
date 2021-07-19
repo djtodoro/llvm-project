@@ -1,5 +1,8 @@
 ; RUN: %llc_dwarf -O0 -filetype=obj < %s | llvm-dwarfdump -debug-info - | FileCheck %s
 
+; No object emitter on nanomips
+; UNSUPPORTED: nanomips
+
 ; Built from the following source with clang -O1
 ; struct S { int i; };
 ; int function(struct S s, int i) { return s.i + i; }

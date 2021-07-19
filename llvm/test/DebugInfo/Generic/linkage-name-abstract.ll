@@ -1,4 +1,8 @@
 ; RUN: %llc_dwarf -O0 -filetype=obj -dwarf-linkage-names=Abstract < %s | llvm-dwarfdump -debug-info - > %t
+
+; No object emitter on nanomips
+; UNSUPPORTED: nanomips
+
 ; RUN: FileCheck %s -check-prefix=ONENAME < %t
 ; RUN: FileCheck %s -check-prefix=REF < %t 
 ; Verify tuning for SCE gets us Abstract only.

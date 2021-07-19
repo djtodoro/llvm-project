@@ -1,4 +1,8 @@
 // UNSUPPORTED: target={{.*}}-zos{{.*}}, target={{.*}}-aix{{.*}}
+
+// No object emitter on nanomips
+// UNSUPPORTED: nanomips
+
 // RUN: rm -rf %t
 // RUN: %clang_cc1 -debug-info-kind=limited -fmodules \
 // RUN:     -DGREETING="Hello World" -UNDEBUG \

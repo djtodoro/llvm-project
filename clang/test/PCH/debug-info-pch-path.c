@@ -2,6 +2,9 @@
 // section in XCOFF yet.
 // UNSUPPORTED: target={{.*}}-aix{{.*}}
 
+// No object emitter on nanomips
+// UNSUPPORTED: nanomips
+
 // RUN: rm -rf %t
 // RUN: mkdir %t
 // RUN: cd %t

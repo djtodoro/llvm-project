@@ -2,6 +2,9 @@
 // crash when the LLVM coroutines passes are run.
 // RUN: %clang_cc1 -emit-obj -std=c++2a -fsanitize=null %s -o %t.o
 
+// No object emitter on nanomips
+// UNSUPPORTED: nanomips
+
 namespace std {
 template <typename R, typename... T> struct coroutine_traits {
   using promise_type = typename R::promise_type;

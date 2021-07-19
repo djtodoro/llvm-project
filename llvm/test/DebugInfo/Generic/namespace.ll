@@ -1,5 +1,8 @@
 ; RUN: %llc_dwarf -O0 -filetype=obj -dwarf-linkage-names=All < %s | llvm-dwarfdump - | FileCheck %s --implicit-check-not "{{DW_TAG|NULL}}"
 
+; No object emitter on nanomips
+; UNSUPPORTED: nanomips
+
 ; CHECK: debug_info contents
 ; CHECK:DW_TAG_compile_unit
 

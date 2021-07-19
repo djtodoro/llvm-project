@@ -1,5 +1,8 @@
 ; RUN: %llc_dwarf -O0 -filetype=obj < %s | llvm-dwarfdump -debug-info - | FileCheck %s
 
+; No object emitter on nanomips
+; UNSUPPORTED: nanomips
+
 ; Built from source:
 ; $ clang++ a.cpp b.cpp -g -c -emit-llvm
 ; $ llvm-link a.bc b.bc -o ab.bc
