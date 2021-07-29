@@ -2,6 +2,8 @@
 // RUN: %clang -fvisibility=default -c -o %t.o %s
 // RUN: llvm-nm %t.o 2>&1 | FileCheck -check-prefix=CHECK-SYMBOLS %s
 
+// UNSUPPORTED: nanomips
+
 // CHECK-TAPI: data", Type: Object, Size: 4 }
 // CHECK-SYMBOLS: data
 int data = 42;
