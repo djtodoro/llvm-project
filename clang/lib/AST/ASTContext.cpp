@@ -9080,11 +9080,12 @@ CreateNanoMipsBuiltinVaListdecl(const ASTContext *Context) {
 
   if (Context->getLangOpts().CPlusPlus) {
     NamespaceDecl *NS;
+    // TODO Rebase: Check if it is nested or not.
     NS = NamespaceDecl::Create(const_cast<ASTContext &>(*Context),
                                Context->getTranslationUnitDecl(),
                                /*Inline*/ false, SourceLocation(),
                                SourceLocation(), &Context->Idents.get("std"),
-                               /*PrevDecl*/ nullptr);
+                               /*PrevDecl*/ nullptr,  /*Nested=*/false);
     NS->setImplicit();
     VaListTagDecl->setDeclContext(NS);
   }
