@@ -8455,8 +8455,9 @@ Address MipsABIInfo::EmitVAArgNanoMips(CodeGenFunction &CGF,
                                     Address(Addr, CGF.Int8Ty, Align), OffsetGEZeroBB,
                                     Address(AddrOverflow, CGF.Int8Ty, Align),OverflowBB,
                                     "addr");
+  // TODO Rebase: Fixme - check the type of the element.
   if (IsIndirect)
-    ArgAddress = Address(CGF.Builder.CreateLoad(ArgAddress), Align);
+    ArgAddress = Address(CGF.Builder.CreateLoad(ArgAddress), CGF.Int8Ty, Align);
 
   return ArgAddress;
 }
