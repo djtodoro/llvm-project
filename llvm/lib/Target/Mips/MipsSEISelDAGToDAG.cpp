@@ -1097,6 +1097,8 @@ bool MipsSEDAGToDAGISel::trySelect(SDNode *Node) {
   case MipsISD::Ins: {
 
     // Validating the node operands.
+    if (Subtarget->hasNanoMips())
+      return false;
     if (Node->getValueType(0) != MVT::i32 && Node->getValueType(0) != MVT::i64)
       return false;
 
