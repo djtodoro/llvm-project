@@ -342,6 +342,9 @@ void MipsPassConfig::addPreEmitPass() {
   if (EnableMulMulFix)
     addPass(createMipsMulMulBugPass());
 
+  if (getMipsSubtarget().hasNanoMips())
+    addPass(createNanoMipsMoveOptimizerPass());
+
   // The delay slot filler pass can potientially create forbidden slot hazards
   // for MIPSR6 and therefore it should go before MipsBranchExpansion pass.
   addPass(createMipsDelaySlotFillerPass());
