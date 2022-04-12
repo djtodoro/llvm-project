@@ -1,4 +1,7 @@
 // UNSUPPORTED: target={{.*}}-zos{{.*}}, target={{.*}}-aix{{.*}}
+
+// REQUIRES: object-emission
+
 @import DependsOnModule;
 
 // RUN: rm -rf %t %t-obj
