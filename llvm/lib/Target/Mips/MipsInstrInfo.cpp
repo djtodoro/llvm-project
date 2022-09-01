@@ -16,6 +16,7 @@
 #include "MCTargetDesc/MipsMCTargetDesc.h"
 #include "MipsSubtarget.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/CodeGen/LivePhysRegs.h"
 #include "llvm/CodeGen/MachineBasicBlock.h"
 #include "llvm/CodeGen/MachineFrameInfo.h"
 #include "llvm/CodeGen/MachineFunction.h"
@@ -1124,8 +1125,6 @@ outliner::OutlinedFunction MipsInstrInfo::getOutliningCandidateInfo(
 
     for (outliner::Candidate &C : RepeatedSequenceLocs) {
 
-      C.initLRU(TRI);
-
       // If we have a noreturn caller, then we're going to be conservative and
       // say that we have to save RA. If we don't have a ret at the end of the
       // block, then we can't reason about liveness accurately.
@@ -1136,7 +1135,7 @@ outliner::OutlinedFunction MipsInstrInfo::getOutliningCandidateInfo(
           C.getMF()->getFunction().hasFnAttribute(Attribute::NoReturn);
 
       // Is RA available? If so, we don't need a save.
-      if (C.LRU.available(Mips::RA_NM) && !IsNoReturn) {
+      if (C.isAvailableAcrossAndOutOfSeq(Mips::RA_NM, TRI) && !IsNoReturn) {
         NumBytesNoStackCalls += 4;
         C.setCallInfo(MachineOutlinerNoRASave, 4);
         CandidatesWithoutStackFixups.push_back(C);
@@ -1152,7 +1151,7 @@ outliner::OutlinedFunction MipsInstrInfo::getOutliningCandidateInfo(
 
       // Is SP used in the sequence at all? If not, we don't have to modify
       // the stack, so we are guaranteed to get the same frame.
-      else if (C.UsedInSequence.available(Mips::SP_NM)) {
+      else if (C.isAvailableInsideSeq(Mips::SP_NM, TRI)) {
         NumBytesNoStackCalls += 12;
         C.setCallInfo(MachineOutlinerDefault, 12);
         CandidatesWithoutStackFixups.push_back(C);
@@ -1176,11 +1175,12 @@ outliner::OutlinedFunction MipsInstrInfo::getOutliningCandidateInfo(
       SetCandidateCallInfo(MachineOutlinerDefault, 12);
 
       if (FlagsSetInAll & MachineOutlinerMBBFlags::HasCalls) {
-        erase_if(RepeatedSequenceLocs, [this](outliner::Candidate &C) {
+        erase_if(RepeatedSequenceLocs, [this, &TRI](outliner::Candidate &C) {
           return (std::any_of(
                      C.front(), std::next(C.back()),
                      [](const MachineInstr &MI) { return MI.isCall(); })) &&
-                 (!C.LRU.available(Mips::RA_NM) || !findRegisterToSaveRA(C));
+                 (!C.isAvailableAcrossAndOutOfSeq(Mips::RA_NM, TRI) ||
+                  !findRegisterToSaveRA(C));
         });
       }
     }
@@ -1348,7 +1348,7 @@ void llvm::MipsInstrInfo::buildOutlinedFrame(
 
 MachineBasicBlock::iterator MipsInstrInfo::insertOutlinedCall(
     Module &M, MachineBasicBlock &MBB, MachineBasicBlock::iterator &It,
-    MachineFunction &MF, const outliner::Candidate &C) const {
+    MachineFunction &MF, outliner::Candidate &C) const {
 
   /*MachineOutlinerTailCall implies that the function is being created from
     a sequence of instructions ending in a return. (ending in a JR to RA)*/
@@ -1418,17 +1418,19 @@ MachineBasicBlock::iterator MipsInstrInfo::insertOutlinedCall(
 }
 
 unsigned
-MipsInstrInfo::findRegisterToSaveRA(const outliner::Candidate &C) const {
+MipsInstrInfo::findRegisterToSaveRA(outliner::Candidate &C) const {
 
   MachineFunction *MF = C.getMF();
 
   const MipsRegisterInfo *MRI = static_cast<const MipsRegisterInfo *>(
       MF->getSubtarget().getRegisterInfo());
+  const TargetRegisterInfo *TRI = MF->getSubtarget().getRegisterInfo();
 
   for (unsigned Reg : Mips::GPR32NMRegClass) {
 
     if (!MRI->isReservedReg(*MF, Reg) && Reg != Mips::RA_NM &&
-        C.LRU.available(Reg) && C.UsedInSequence.available(Reg) &&
+        C.isAvailableAcrossAndOutOfSeq(Reg, *TRI) &&
+        C.isAvailableInsideSeq(Reg, *TRI) &&
         (Reg == Mips::S0_NM || Reg == Mips::S1_NM || Reg == Mips::S2_NM ||
          Reg == Mips::S3_NM || Reg == Mips::S4_NM || Reg == Mips::S5_NM ||
          Reg == Mips::S6_NM || Reg == Mips::S7_NM))
@@ -1467,11 +1469,12 @@ bool MipsInstrInfo::getMemOperandWithOffsetWidth(
   // set to 1.
   if (LdSt.getNumExplicitOperands() == 3) {
     BaseOp = &LdSt.getOperand(1);
-    Offset = LdSt.getOperand(2).getImm() * Scale.getKnownMinSize();
+    // TODO rebase: Check this, it was getKnownMinSize().
+    Offset = LdSt.getOperand(2).getImm() * Scale.getKnownMinValue();
   } else {
     assert(LdSt.getNumExplicitOperands() == 4 && "invalid number of operands");
     BaseOp = &LdSt.getOperand(2);
-    Offset = LdSt.getOperand(3).getImm() * Scale.getKnownMinSize();
+    Offset = LdSt.getOperand(3).getImm() * Scale.getKnownMinValue();
   }
   OffsetIsScalable = Scale.isScalable();
 
@@ -1589,7 +1592,8 @@ void MipsInstrInfo::fixupPostOutline(MachineBasicBlock &MBB) const {
     // We've pushed the return address to the stack, so add 16 to the offset.
     // This is safe, since we already checked if it would overflow when we
     // checked if this instruction was legal to outline.
-    int64_t NewImm = (Offset + 16) / (int64_t)Scale.getFixedSize();
+    // TODO rebase: Check this, it was Scale.getFixedSize().
+    int64_t NewImm = (Offset + 16) / (int64_t)Scale.getFixedValue();
     StackOffsetOperand.setImm(NewImm);
   }
 }
