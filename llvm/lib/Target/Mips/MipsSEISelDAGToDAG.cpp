@@ -485,8 +485,9 @@ bool MipsSEDAGToDAGISel::selectIntAddrLSL2MM(SDValue Addr, SDValue &Base,
 
 bool MipsSEDAGToDAGISel::selectIntAddrSImm9(SDValue Addr, SDValue &Base,
                                             SDValue &Offset) const {
-  return selectAddrFrameIndex(Addr, Base, Offset) ||
-    selectAddrFrameIndexOffset(Addr, Base, Offset, 9);
+  // Don't allow frame indices for now due to limted offsets bits.
+  return selectAddrFrameIndexOffset(Addr, Base, Offset, 9) &&
+         !isa<FrameIndexSDNode>(Base);
 }
 
 bool MipsSEDAGToDAGISel::selectIntAddrSImm10(SDValue Addr, SDValue &Base,
@@ -565,7 +566,8 @@ bool MipsSEDAGToDAGISel::selectAddrFrameIndexUOffset(
 
 bool MipsSEDAGToDAGISel::selectIntAddrUImm12(SDValue Addr, SDValue &Base,
                                              SDValue &Offset) const {
-  return selectAddrFrameIndexUOffset(Addr, Base, Offset, 12, 0);
+  return selectAddrFrameIndex(Addr, Base, Offset) ||
+         selectAddrFrameIndexUOffset(Addr, Base, Offset, 12, 0);
 }
 
 bool MipsSEDAGToDAGISel::selectIntAddrUImm19s2(SDValue Addr, SDValue &Base,
