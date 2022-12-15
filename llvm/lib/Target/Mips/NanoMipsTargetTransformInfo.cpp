@@ -98,3 +98,7 @@ void NanoMipsTTIImpl::getUnrollingPreferences(Loop *L, ScalarEvolution &SE,
   UP.Threshold = 60;
   UP.OptSizeThreshold = 0;
 }
+
+bool NanoMipsTTIImpl::hasDivRemOp(Type *DataType, bool IsSigned) {
+  return F->hasOptSize() || (DataType->isIntegerTy(64) && !IsSigned);
+}
