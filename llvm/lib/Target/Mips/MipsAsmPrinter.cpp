@@ -89,7 +89,7 @@ void MipsAsmPrinter::emitJumpTableInfo() {
   const TargetLoweringObjectFile &TLOF = getObjFileLowering();
 
   MCSection *ReadOnlySection = TLOF.getSectionForJumpTable(F, TM);
-  OutStreamer->SwitchSection(ReadOnlySection);
+  OutStreamer->switchSection(ReadOnlySection);
 
   auto MFI = MF->getInfo<MipsFunctionInfo>();
   for (unsigned JTI = 0, e = JT.size(); JTI != e; ++JTI) {

@@ -44,6 +44,7 @@ FunctionPass *createNanoMipsLoadStoreOptimizerPass();
 FunctionPass *createNanoMipsMoveOptimizerPass();
 FunctionPass *createNanoMipsRegisterReAllocationPass();
 FunctionPass *createRedundantCopyEliminationPass();
+FunctionPass *createNanoMipsCompressJumpTablesPass();
 
 InstructionSelector *createMipsInstructionSelector(const MipsTargetMachine &,
                                                    MipsSubtarget &,
