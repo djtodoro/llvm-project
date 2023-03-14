@@ -64,7 +64,7 @@ struct NMLoadStoreMultipleOpt : public MachineFunctionPass {
   unsigned getRegNo(unsigned Reg);
   bool isValidLoadStore(MachineInstr &MI, bool IsLoad, InstrList);
   bool isValidNextLoadStore(LSIns Prev, LSIns Next, size_t &GapSize,
-                            size_t &CurrSeqSize);
+                            size_t &CurrSeqSize, bool &RegGap);
   bool generateLoadStoreMultiple(MachineBasicBlock &MBB, bool IsLoad);
   void sortLoadStoreList(InstrList &LoadStoreList, bool IsLoad);
 };
@@ -168,7 +168,8 @@ bool NMLoadStoreMultipleOpt::isValidLoadStore(MachineInstr &MI, bool IsLoad,
 
 bool NMLoadStoreMultipleOpt::isValidNextLoadStore(LSIns Prev, LSIns Next,
                                                   size_t &GapSize,
-                                                  size_t &CurrSeqSize) {
+                                                  size_t &CurrSeqSize,
+                                                  bool &RegGap) {
   unsigned PrevRtNo = getRegNo(Prev.Rt);
   unsigned DesiredRtNo = PrevRtNo != 0 ? (PrevRtNo + 1) : 0;
   Register DesiredRtReg = RC.getRegister(DesiredRtNo);
@@ -178,8 +179,19 @@ bool NMLoadStoreMultipleOpt::isValidNextLoadStore(LSIns Prev, LSIns Next,
     // lw a1, 12(a4)
     // lw a3, 16(a4)
     if (Next.Rt != DesiredRtReg) {
-      // TODO
-      return false;
+      // For now, the instruction like lw a3, 16(a4) insterupts the sequence.
+      if (CurrSeqSize < 2)
+        return false;
+
+      LivePhysRegs LiveRegs(*TRI);
+      computeLiveIns(LiveRegs, *Prev.MBB);
+      assert(Register::isPhysicalRegister(DesiredRtNo) &&
+             "Desired register is not physical!");
+      if (!LiveRegs.available(*MRI, (DesiredRtReg)))
+        return false;
+
+      RegGap = true;
+      return true;
     } else {
       return true;
     }
@@ -215,6 +227,7 @@ bool NMLoadStoreMultipleOpt::generateLoadStoreMultiple(MachineBasicBlock &MBB,
   struct Candidate {
     InstrList Sequence;
     size_t GapSize;
+    bool Move = false;
   };
   InstrList SequenceToSort;
   SmallVector<InstrList, 3> SequenceList;
@@ -236,6 +249,7 @@ bool NMLoadStoreMultipleOpt::generateLoadStoreMultiple(MachineBasicBlock &MBB,
   InstrList Sequence;
   size_t GapSize = 0;
   size_t SeqSize = 0;
+  bool RegGap = false;
   for (size_t i = 0; i < SequenceList.size(); i++) {
     sortLoadStoreList(SequenceList[i], IsLoad);
     for (auto &MI : SequenceList[i]) {
@@ -245,6 +259,7 @@ bool NMLoadStoreMultipleOpt::generateLoadStoreMultiple(MachineBasicBlock &MBB,
         Sequence.clear();
         GapSize = 0;
         SeqSize = 0;
+        RegGap = false;
       }
       // When starting a new sequence, there's no need to do any checks.
       if (Sequence.empty()) {
@@ -253,16 +268,26 @@ bool NMLoadStoreMultipleOpt::generateLoadStoreMultiple(MachineBasicBlock &MBB,
         continue;
       }
 
-      if (!isValidNextLoadStore(Sequence.back(), MI, GapSize, SeqSize)) {
+      if (!isValidNextLoadStore(Sequence.back(), MI, GapSize, SeqSize,
+                                RegGap)) {
         if (SeqSize > 1)
           Candidates.push_back({Sequence, GapSize});
         Sequence.clear();
         GapSize = 0;
         SeqSize = 0;
+        RegGap = false;
       }
 
       Sequence.push_back(MI);
       SeqSize++;
+
+      if (RegGap) {
+        Candidates.push_back({Sequence, GapSize, true});
+        Sequence.clear();
+        GapSize = 0;
+        SeqSize = 0;
+        RegGap = false;
+      }
       continue;
     }
 
@@ -277,6 +302,7 @@ bool NMLoadStoreMultipleOpt::generateLoadStoreMultiple(MachineBasicBlock &MBB,
       Sequence.clear();
       SeqSize = 0;
       GapSize = 0;
+      RegGap = false;
     }
   }
 
@@ -305,6 +331,12 @@ bool NMLoadStoreMultipleOpt::generateLoadStoreMultiple(MachineBasicBlock &MBB,
             .addImm(Offset)
             .addImm(Seq.size() + C.GapSize);
     BMI.cloneMergedMemRefs(Seq);
+    if (C.Move) {
+      BuildMI(MBB, std::next(MBBIter(BMI.getInstr())), Base->getDebugLoc(),
+              TII->get(Mips::MOVE_NM))
+          .addReg(Seq.back()->getOperand(0).getReg(), RegState::Define)
+          .addReg(Seq[Seq.size() - 2]->getOperand(0).getReg() + 1);
+    }
     for (auto *MI : Seq) {
       if (MI != Base)
         BMI.addReg(MI->getOperand(0).getReg(),
