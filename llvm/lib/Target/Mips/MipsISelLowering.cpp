@@ -3667,6 +3667,12 @@ static bool CC_MipsO32(unsigned ValNo, MVT ValVT, MVT LocVT,
 //                  Call Calling Convention Implementation
 //===----------------------------------------------------------------------===//
 
+
+bool MipsTargetLowering::mayBeEmittedAsTailCall(const CallInst *CI) const {
+  return CI->isTailCall() && Subtarget.hasNanoMips();
+}
+
+
 SDValue MipsTargetLowering::passArgOnStack(SDValue StackPtr, unsigned Offset,
                                            SDValue Chain, SDValue Arg,
                                            const SDLoc &DL, bool IsTailCall,
@@ -3883,12 +3889,14 @@ MipsTargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
         CCInfo, NextStackOffset, *MF.getInfo<MipsFunctionInfo>());
      if (GlobalAddressSDNode *G = dyn_cast<GlobalAddressSDNode>(Callee)) {
       InternalLinkage = G->getGlobal()->hasInternalLinkage();
-      IsTailCall &= (InternalLinkage || G->getGlobal()->hasLocalLinkage() ||
+      IsTailCall &= ((ABI.IsP32() && !isPositionIndependent()) ||
+                     InternalLinkage || G->getGlobal()->hasLocalLinkage() ||
                      G->getGlobal()->hasPrivateLinkage() ||
                      G->getGlobal()->hasHiddenVisibility() ||
                      G->getGlobal()->hasProtectedVisibility());
      }
   }
+
   if (!IsTailCall && CLI.CB && CLI.CB->isMustTailCall())
     report_fatal_error("failed to perform tail call elimination on a call "
                        "site marked musttail");
