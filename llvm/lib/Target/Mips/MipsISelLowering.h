@@ -247,6 +247,9 @@ class TargetRegisterClass;
       VEXTRACT_SEXT_ELT,
       VEXTRACT_ZEXT_ELT,
 
+      // nanoMIPS br_jt.
+      BR_JT,
+
       // Load/Store Left/Right nodes.
       LWL = ISD::FIRST_TARGET_MEMORY_OPCODE,
       LWR,
@@ -261,10 +264,7 @@ class TargetRegisterClass;
       UALW,
       UALH,
       UASW,
-      UASH,
-
-      // nanoMIPS br_jt.
-      BR_JT
+      UASH
     };
 
   } // ene namespace MipsISD
