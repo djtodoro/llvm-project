@@ -1,7 +1,7 @@
-; RUN: %llc_dwarf -mtriple x86_64-gnu-linux -O0 -filetype=obj < %s | llvm-dwarfdump -debug-info - | FileCheck %s
-
 ; No object emitter on nanomips
 ; UNSUPPORTED: nanomips
+
+; RUN: %llc_dwarf -mtriple x86_64-gnu-linux -O0 -filetype=obj < %s | llvm-dwarfdump -debug-info - | FileCheck %s
 
 ; Build from the following source with clang -O2.
 

@@ -1,8 +1,8 @@
-; RUN: %llc_dwarf -dwarf-version=2 -O0 -filetype=obj < %s | llvm-dwarfdump -debug-info - | FileCheck --check-prefix=CHECK --check-prefix=V2 %s
-; RUN: %llc_dwarf -dwarf-version=3 -O0 -filetype=obj < %s | llvm-dwarfdump -debug-info - | FileCheck --check-prefix=CHECK --check-prefix=V3 %s
-
 ; No object emitter on nanomips
 ; UNSUPPORTED: nanomips
+
+; RUN: %llc_dwarf -dwarf-version=2 -O0 -filetype=obj < %s | llvm-dwarfdump -debug-info - | FileCheck --check-prefix=CHECK --check-prefix=V2 %s
+; RUN: %llc_dwarf -dwarf-version=3 -O0 -filetype=obj < %s | llvm-dwarfdump -debug-info - | FileCheck --check-prefix=CHECK --check-prefix=V3 %s
 
 ; CHECK: DW_AT_name ("dst")
 ; V2: DW_AT_type ([[PTR:0x........]]
