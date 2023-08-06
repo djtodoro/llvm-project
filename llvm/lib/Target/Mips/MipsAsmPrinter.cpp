@@ -72,6 +72,11 @@ using namespace llvm;
 
 extern cl::opt<bool> EmitJalrReloc;
 
+static cl::opt<bool> DisableNanoMipsBalcStubs(
+    "disable-nanomips-balc-stubs", cl::Hidden,
+    cl::desc("NANOMIPS: Disable balc stubs optimization in the linker"),
+    cl::init(false));
+
 void MipsAsmPrinter::emitJumpTableInfo() {
   if (!Subtarget->hasNanoMips() || Subtarget->useAbsoluteJumpTables() ) {
     AsmPrinter::emitJumpTableInfo();
@@ -329,6 +334,19 @@ static void emitDirectiveRelocJalr(const MachineInstr &MI,
   }
 }
 
+// NOTE: This is being used to control optimization of BALC in the linker.
+static void emitDirectivesToDisbleBalcStubs(const MachineInstr &MI,
+                                            MCContext &OutContext,
+                                            TargetMachine &TM,
+                                            MCStreamer &OutStreamer) {
+  assert(DisableNanoMipsBalcStubs || !MI.getMF()->getFunction().hasOptSize());
+  MCSymbol *OffsetLabel = OutContext.createTempSymbol();
+  const MCExpr *OffsetExpr = MCSymbolRefExpr::create(OffsetLabel, OutContext);
+  OutStreamer.emitRelocDirective(*OffsetExpr, "R_NANOMIPS_NOTRAMP", nullptr,
+                                 SMLoc(), *TM.getMCSubtargetInfo());
+  OutStreamer.emitLabel(OffsetLabel);
+}
+
 void MipsAsmPrinter::emitInstruction(const MachineInstr *MI) {
   MipsTargetStreamer &TS = getTargetStreamer();
   unsigned Opc = MI->getOpcode();
@@ -427,6 +445,12 @@ void MipsAsmPrinter::emitInstruction(const MachineInstr *MI) {
       emitBrsc(*OutStreamer, &*I);
       continue;
     }
+
+    if (Subtarget->hasNanoMips() && I->getOpcode() == Mips::BALC_NM &&
+        (!I->getMF()->getFunction().hasOptSize() || DisableNanoMipsBalcStubs)) {
+      emitDirectivesToDisbleBalcStubs(*I, OutContext, TM, *OutStreamer);
+    }
+
     // The inMips16Mode() test is not permanent.
     // Some instructions are marked as pseudo right now which
     // would make the test fail for the wrong reason but
