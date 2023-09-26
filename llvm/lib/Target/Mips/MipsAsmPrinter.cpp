@@ -347,6 +347,17 @@ static void emitDirectivesToDisbleBalcStubs(const MachineInstr &MI,
   OutStreamer.emitLabel(OffsetLabel);
 }
 
+static void emitDirectivesToEnableBalcStubs(const MachineInstr &MI,
+                                            MCContext &OutContext,
+                                            TargetMachine &TM,
+                                            MCStreamer &OutStreamer) {
+  assert(!DisableNanoMipsBalcStubs && MI.getMF()->getFunction().hasOptSize());
+  MCSymbol *DummySymbol =
+      OutContext.createNamedTempSymbol("__reloc_balc_stub_\\2");
+  DummySymbol->setUsedInReloc();
+  OutStreamer.emitLabel(DummySymbol);
+}
+
 void MipsAsmPrinter::emitInstruction(const MachineInstr *MI) {
   MipsTargetStreamer &TS = getTargetStreamer();
   unsigned Opc = MI->getOpcode();
@@ -446,11 +457,14 @@ void MipsAsmPrinter::emitInstruction(const MachineInstr *MI) {
       continue;
     }
 
-    if (Subtarget->hasNanoMips() && I->getOpcode() == Mips::BALC_NM &&
-        (!I->getMF()->getFunction().hasOptSize() || DisableNanoMipsBalcStubs)) {
-      emitDirectivesToDisbleBalcStubs(*I, OutContext, TM, *OutStreamer);
+    if (Subtarget->hasNanoMips() && I->getOpcode() == Mips::BALC_NM) {
+      if (!I->getMF()->getFunction().hasOptSize() || DisableNanoMipsBalcStubs)
+        emitDirectivesToDisbleBalcStubs(*I, OutContext, TM, *OutStreamer);
+      else if (I->getMF()->getFunction().hasOptSize() &&
+               !DisableNanoMipsBalcStubs) {
+        emitDirectivesToEnableBalcStubs(*I, OutContext, TM, *OutStreamer);
+      }
     }
-
     // The inMips16Mode() test is not permanent.
     // Some instructions are marked as pseudo right now which
     // would make the test fail for the wrong reason but
