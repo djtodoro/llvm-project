@@ -64,6 +64,7 @@
 #include "llvm/Object/ObjectFile.h"
 #include "llvm/Object/OffloadBinary.h"
 #include "llvm/Object/Wasm.h"
+#include "llvm/Object/XCOFFObjectFile.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/Option.h"
@@ -220,6 +221,7 @@ std::vector<std::string> objdump::FilterSections;
 bool objdump::SectionHeaders;
 static bool ShowAllSymbols;
 static bool ShowLMA;
+static bool ShowGNUCompat;
 bool objdump::PrintSource;
 
 static uint64_t StartAddress;
@@ -2246,7 +2248,14 @@ static bool shouldDisplayLMA(const ObjectFile &Obj) {
   for (const SectionRef &S : ToolSectionFilter(Obj))
     if (S.getAddress() != getELFSectionLMA(S))
       return true;
-  return ShowLMA;
+  return ShowLMA || ShowGNUCompat;
+}
+
+// Returns true if we need to show GNU compatible section headers, including
+// file-offset, alignment and LMA. We show it only when the platform is ELF
+// and the --show-gnu-compact flag is used.
+static bool shouldDisplayGNUCompat(ObjectFile &Obj) {
+  return (Obj.isELF() && ShowGNUCompat);
 }
 
 static size_t getMaxSectionNameWidth(const ObjectFile &Obj) {
@@ -2259,6 +2268,17 @@ static size_t getMaxSectionNameWidth(const ObjectFile &Obj) {
   return MaxWidth;
 }
 
+static uint64_t getFileOffset(ObjectFile &Obj,
+                              const SectionRef &Section) {
+  if (Obj.isELF())
+    return ELFSectionRef(Section).getOffset();
+
+  WithColor::error(errs(), ToolName)
+    << "This operation is only currently supported "
+    "for ELF object files.\n";
+  return 0;
+}
+
 void objdump::printSectionHeaders(ObjectFile &Obj) {
   if (Obj.isELF() && Obj.sections().empty())
     createFakeELFSections(Obj);
@@ -2266,11 +2286,17 @@ void objdump::printSectionHeaders(ObjectFile &Obj) {
   size_t NameWidth = getMaxSectionNameWidth(Obj);
   size_t AddressWidth = 2 * Obj.getBytesInAddress();
   bool HasLMAColumn = shouldDisplayLMA(Obj);
+  bool GNUCompat = shouldDisplayGNUCompat(Obj);
   outs() << "\nSections:\n";
-  if (HasLMAColumn)
+  if (HasLMAColumn) {
     outs() << "Idx " << left_justify("Name", NameWidth) << " Size     "
            << left_justify("VMA", AddressWidth) << " "
-           << left_justify("LMA", AddressWidth) << " Type\n";
+           << left_justify("LMA", AddressWidth);
+    if (GNUCompat)
+      outs() << " " << left_justify("File off", AddressWidth) << " "
+	     << left_justify("Algn", 4);
+    outs() << " Type\n";
+  }
   else
     outs() << "Idx " << left_justify("Name", NameWidth) << " Size     "
            << left_justify("VMA", AddressWidth) << " Type\n";
@@ -2292,12 +2318,22 @@ void objdump::printSectionHeaders(ObjectFile &Obj) {
     if (Section.isDebugSection())
       Type += Type.empty() ? "DEBUG" : ", DEBUG";
 
-    if (HasLMAColumn)
+    uint64_t FileOffset = getFileOffset(Obj, Section);
+    // Note: alignment = 0 is a "valid" alignment but not considered so for
+    // llvm::Align. So use valueOrOne() to be nice in that case.
+    llvm::Align SectionAlign =
+        llvm::MaybeAlign(Section.getAlignment()).valueOrOne();
+
+    if (HasLMAColumn) {
       outs() << format("%3" PRIu64 " %-*s %08" PRIx64 " ", Idx, NameWidth,
                        Name.str().c_str(), Size)
              << format_hex_no_prefix(VMA, AddressWidth) << " "
-             << format_hex_no_prefix(getELFSectionLMA(Section), AddressWidth)
-             << " " << Type << "\n";
+             << format_hex_no_prefix(getELFSectionLMA(Section), AddressWidth);
+      if (GNUCompat)
+	outs() << " " << format_hex_no_prefix(FileOffset, AddressWidth) << " "
+	       << "2**" << Log2(SectionAlign);
+      outs() << " " << Type << "\n";
+    }
     else
       outs() << format("%3" PRIu64 " %-*s %08" PRIx64 " ", Idx, NameWidth,
                        Name.str().c_str(), Size)
@@ -3058,6 +3094,7 @@ static void parseObjdumpOptions(const llvm::opt::InputArgList &InputArgs) {
   SectionHeaders = InputArgs.hasArg(OBJDUMP_section_headers);
   ShowAllSymbols = InputArgs.hasArg(OBJDUMP_show_all_symbols);
   ShowLMA = InputArgs.hasArg(OBJDUMP_show_lma);
+  ShowGNUCompat = InputArgs.hasArg(OBJDUMP_show_gnu_compat);
   PrintSource = InputArgs.hasArg(OBJDUMP_source);
   parseIntArg(InputArgs, OBJDUMP_start_address_EQ, StartAddress);
   HasStartAddressFlag = InputArgs.hasArg(OBJDUMP_start_address_EQ);
