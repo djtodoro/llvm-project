@@ -33,6 +33,12 @@
 #  define _LIBCPP_COMPILER_GCC
 #endif
 
+// libcxx build depends on interfaces which are only available with
+// this set, at least for nanoMIPS/newlib embedded configuration.
+#if defined(__nanomips__)
+#define _GNU_SOURCE 1
+#endif
+
 #ifdef __cplusplus
 
 // _LIBCPP_VERSION represents the version of libc++, which matches the version of LLVM.
