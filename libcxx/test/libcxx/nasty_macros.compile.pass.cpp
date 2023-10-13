@@ -97,7 +97,10 @@
 # define __pre NASTY_MACRO
 #endif
 
-#define __input NASTY_MACRO
+
+// NEWLIB uses this as parameter name in prototypes (stdlib.h)
+// We cannot rely on _NEWLIB_VERSION being known here
+//#define __input NASTY_MACRO
 #define __output NASTY_MACRO
 
 #define __acquire NASTY_MACRO
