@@ -17,6 +17,7 @@
 #include "MCTargetDesc/MipsFixupKinds.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/MC/MCAsmBackend.h"
+#include "llvm/MC/MCSubtargetInfo.h"
 
 namespace llvm {
 
@@ -28,12 +29,13 @@ class Target;
 class MipsAsmBackend : public MCAsmBackend {
   Triple TheTriple;
   bool IsN32;
+  bool HasFeatureRelax;
 
 public:
   MipsAsmBackend(const Target &T, const MCRegisterInfo &MRI, const Triple &TT,
-                 StringRef CPU, bool N32)
+                 StringRef CPU, bool N32, bool FeatureRelax)
       : MCAsmBackend(TT.isLittleEndian() ? support::little : support::big),
-        TheTriple(TT), IsN32(N32) {}
+    TheTriple(TT), IsN32(N32), HasFeatureRelax(FeatureRelax) {}
 
   std::unique_ptr<MCObjectTargetWriter>
   createObjectTargetWriter() const override;
@@ -81,6 +83,12 @@ public:
                            const MCFixup &Fixup, const MCFragment *DF,
                            const MCValue &Target, uint64_t &Value,
                            bool &WasForced) override;
+
+  bool relaxDwarfLineAddr(MCDwarfLineAddrFragment &DF,
+			  MCAsmLayout &Layout, bool &WasRelaxed) const override;
+
+  bool relaxDwarfCFA(MCDwarfCallFrameFragment &DF, MCAsmLayout &Layout,
+		     bool &WasRelaxed) const override;
 }; // class MipsAsmBackend
 
 } // namespace
