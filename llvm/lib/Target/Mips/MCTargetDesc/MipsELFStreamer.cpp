@@ -154,9 +154,11 @@ void MipsELFStreamer::emitValueImpl(const MCExpr *Value, unsigned Size,
   enum Mips::Fixups reloc;
   MCDataFragment *DF;
   bool Ashr1 = isLabelAshr1(Value);
+  unsigned Flags = getAssembler().getELFHeaderEFlags();
 
-  if (!ELFTargetStreamer->isNanoMipsEnabled() ||
-      !requiresFixups(getContext(), Value, A, B)) {
+   if (!ELFTargetStreamer->isNanoMipsEnabled() ||
+       !requiresFixups(getContext(), Value, A, B) ||
+       (Flags & ELF::EF_NANOMIPS_LINKRELAX) == 0) {
     MCELFStreamer::emitValueImpl(Value, Size, Loc);
     return;
   }
