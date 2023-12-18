@@ -104,3 +104,7 @@ if (LIBCXX_CONFIGURE_IDE)
             EXCLUDE_FROM_ALL ON
   )
 endif()
+
+if (CMAKE_C_COMPILER_TARGET STREQUAL "nanomips-elf")
+  add_library(stubs STATIC libstubs.c)
+endif()
