@@ -1604,7 +1604,7 @@ SelectInlineAsmMemoryOperand(const SDValue &Op, unsigned ConstraintID,
         OutOps.push_back(Offset);
         return false;
       }
-    } else if (Subtarget->hasMips32r6() || Subtarget->hasNanoMips()) {
+    } else if (Subtarget->hasMips32r6()) {
       // On MIPS32r6/MIPS64r6/nanoMIPS, they can only handle 9-bit offsets.
       if (selectAddrRegImm9(Op, Base, Offset)) {
         OutOps.push_back(Base);
