@@ -728,7 +728,6 @@ getSymGPRel(const MCInst &MI, unsigned OpNo,
 
   if (MO.isExpr()) {
     Expr = MO.getExpr();
-    const MipsMCExpr *MipsExpr = cast<MipsMCExpr>(Expr);
     Mips::Fixups FixupKind = Mips::Fixups(0);
     unsigned Offset = 0;
     assert (MipsExpr->getKind() == MipsMCExpr::MEK_GPREL);
@@ -1136,9 +1135,8 @@ unsigned MipsMCCodeEmitter::
 getMemEncodingNMGP(const MCInst &MI, unsigned OpNo,
                            SmallVectorImpl<MCFixup> &Fixups,
                            const MCSubtargetInfo &STI) const {
-  unsigned RegBits=getMachineOpValue(MI, MI.getOperand(OpNo), Fixups,
-				     STI);
-  assert(MI.getOperand(OpNo).isReg() && RegBits == 28);
+  assert(MI.getOperand(OpNo).isReg() &&
+         getMachineOpValue(MI, MI.getOperand(OpNo), Fixups, STI) == 28);
   const MCOperand &MO = MI.getOperand(OpNo+1);
   unsigned OffBits = getMachineOpValue(MI, MO,
                                        Fixups, STI);
@@ -1179,9 +1177,8 @@ unsigned MipsMCCodeEmitter::
 getMemEncodingNMSP(const MCInst &MI, unsigned OpNo,
                            SmallVectorImpl<MCFixup> &Fixups,
                            const MCSubtargetInfo &STI) const {
-  unsigned RegBits=getMachineOpValue(MI, MI.getOperand(OpNo), Fixups,
-				     STI);
-  assert(MI.getOperand(OpNo).isReg() && RegBits == 29);
+  assert(MI.getOperand(OpNo).isReg() &&
+         getMachineOpValue(MI, MI.getOperand(OpNo), Fixups, STI) == 29);
   unsigned OffBits = getMachineOpValue(MI, MI.getOperand(OpNo+1),
                                        Fixups, STI);
   return OffBits;

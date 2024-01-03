@@ -932,7 +932,6 @@ bool MipsAsmBackend::relaxDwarfCFA(MCDwarfCallFrameFragment &DF,
   if (!TheTriple.isNanoMips())
     return false;
 
-  MCContext &C = Layout.getAssembler().getContext();
   const MCExpr &AddrDelta = DF.getAddrDelta();
   SmallVectorImpl<char> &Data = DF.getContents();
   SmallVectorImpl<MCFixup> &Fixups = DF.getFixups();
@@ -947,7 +946,8 @@ bool MipsAsmBackend::relaxDwarfCFA(MCDwarfCallFrameFragment &DF,
   Fixups.clear();
   raw_svector_ostream OS(Data);
 
-  assert(C.getAsmInfo()->getMinInstAlignment() == 1 &&
+  assert(Layout.getAssembler().getContext()
+         .getAsmInfo()->getMinInstAlignment() == 1 &&
          "expected 1-byte alignment");
   if (Value == 0) {
     WasRelaxed = OldSize != Data.size();
