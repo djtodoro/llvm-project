@@ -860,7 +860,7 @@ bool MipsAsmBackend::evaluateTargetFixup(
 bool MipsAsmBackend::relaxDwarfLineAddr(MCDwarfLineAddrFragment &DF,
 					MCAsmLayout &Layout,
 					bool &WasRelaxed) const {
-  if (!TheTriple.isNanoMips() || !HasFeatureRelax)
+  if (!TheTriple.isNanoMips())
     return false;
 
   MCContext &C = Layout.getAssembler().getContext();
@@ -929,7 +929,7 @@ bool MipsAsmBackend::relaxDwarfLineAddr(MCDwarfLineAddrFragment &DF,
 bool MipsAsmBackend::relaxDwarfCFA(MCDwarfCallFrameFragment &DF,
 				   MCAsmLayout &Layout,
 				   bool &WasRelaxed) const {
-  if (!TheTriple.isNanoMips() || !HasFeatureRelax)
+  if (!TheTriple.isNanoMips())
     return false;
 
   MCContext &C = Layout.getAssembler().getContext();
@@ -990,5 +990,5 @@ MCAsmBackend *llvm::createMipsAsmBackend(const Target &T,
   MipsABIInfo ABI = MipsABIInfo::computeTargetABI(STI.getTargetTriple(),
                                                   STI.getCPU(), Options);
   return new MipsAsmBackend(T, MRI, STI.getTargetTriple(), STI.getCPU(),
-                            ABI.IsN32(), STI.hasFeature(Mips::FeatureRelax));
+                            ABI.IsN32());
 }
