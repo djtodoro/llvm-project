@@ -200,6 +200,10 @@ namespace clang {
 
     CodeGenerator *getCodeGenerator() { return Gen.get(); }
 
+    ASTConsumer::TypeAliasing *getTypeAliasing() override {
+      return Gen->getTypeAliasing();
+    }
+
     void HandleCXXStaticMemberVarInstantiation(VarDecl *VD) override {
       Gen->HandleCXXStaticMemberVarInstantiation(VD);
     }

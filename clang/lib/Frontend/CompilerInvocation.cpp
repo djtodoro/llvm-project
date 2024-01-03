@@ -2332,6 +2332,9 @@ void CompilerInvocation::GenerateDiagnosticArgs(
     // This option is automatically generated from UndefPrefixes.
     if (Warning == "undef-prefix")
       continue;
+    // This option is automatically generated from StrictAliasing.
+    if (Warning == "strict-aliasing")
+      continue;
     Args.push_back(SA(StringRef("-W") + Warning));
   }
 
