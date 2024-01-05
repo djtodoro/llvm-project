@@ -41,6 +41,7 @@
 #include "llvm/Support/StringSaver.h"
 #include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/raw_ostream.h"
+#include "mtk/tool_copyright.h"
 #include <cstdlib>
 #include <optional>
 #include <string>
@@ -2555,6 +2556,7 @@ public:
     OS << " with assertions";
 #endif
     OS << ".\n";
+    OS << TOOL_COPYRIGHT;
 
     // Iterate over any registered extra printers and call them to add further
     // information.

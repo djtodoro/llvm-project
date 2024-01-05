@@ -95,6 +95,7 @@
 #include "llvm/Support/StringSaver.h"
 #include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/raw_ostream.h"
+#include "mtk/tool_copyright.h"
 #include <cstdlib> // ::getenv
 #include <map>
 #include <memory>
@@ -2077,6 +2078,7 @@ bool Driver::HandleImmediateArgs(const Compilation &C) {
   if (C.getArgs().hasArg(options::OPT__version)) {
     // Follow gcc behavior and use stdout for --version and stderr for -v.
     PrintVersion(C, llvm::outs());
+    llvm::outs() << TOOL_COPYRIGHT << "\n";
     return false;
   }
 
