@@ -1889,6 +1889,11 @@ defm sanitize_stats : BoolOption<"f", "sanitize-stats",
   PosFlag<SetTrue, [], "Enable">, NegFlag<SetFalse, [CoreOption, NoXarchOption], "Disable">,
   BothFlags<[], " sanitizer statistics gathering.">>,
   Group<f_clang_Group>;
+defm warn_ubsantrap : BoolOption<"f", "warn-ubsantrap",
+  CodeGenOpts<"WarnUBSanTraps">, DefaultFalse,
+  PosFlag<SetTrue, [], "Enable">, NegFlag<SetFalse, [CoreOption, NoXarchOption], "Disable">,
+  BothFlags<[], " warn about unguarded sanitizer traps.">>,
+  Group<f_clang_Group>;
 def fsanitize_thread_memory_access : Flag<["-"], "fsanitize-thread-memory-access">,
                                      Group<f_clang_Group>,
                                      HelpText<"Enable memory access instrumentation in ThreadSanitizer (default)">;

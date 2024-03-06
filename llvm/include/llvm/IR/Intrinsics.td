@@ -1363,6 +1363,16 @@ def int_debugtrap : Intrinsic<[]>,
                     ClangBuiltin<"__builtin_debugtrap">;
 def int_ubsantrap : Intrinsic<[], [llvm_i8_ty],
                               [IntrNoReturn, IntrCold, ImmArg<ArgIndex<0>>]>;
+// When warning about unguarded traps is required, use this trap
+// that has an additional operand containing source
+// information of triggering expression.
+// Multiple regular traps are combined during optimization
+// such that information regarding original expression triggering each trap
+// is lost.
+// This trap is an intermediate form of the regular trap,
+// to be finally converted back to the regular form, after issuing the warning
+def int_ubsantrap_unique : Intrinsic<[], [llvm_i8_ty, llvm_metadata_ty],
+                              [IntrNoReturn, IntrCold, ImmArg<ArgIndex<0>>]>;
 
 // Support for dynamic deoptimization (or de-specialization)
 def int_experimental_deoptimize : Intrinsic<[llvm_any_ty], [llvm_vararg_ty],
