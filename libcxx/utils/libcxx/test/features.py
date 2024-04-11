@@ -139,12 +139,15 @@ DEFAULT_FEATURES = [
 
   Feature(name='has-unix-headers',
           when=lambda cfg: sourceBuilds(cfg, """
-            #include <unistd.h>
-            #include <sys/wait.h>
-            int main(int, char**) {
-              return 0;
-            }
-          """)),
+           #include <unistd.h>
+           #include <sys/wait.h>
+           #if !defined(_POSIX_VERSION) && !defined(_XOPEN_VERSION)
+             #error "Not a unix system"
+           #endif
+           int main(int, char**) {
+             return 0;
+           }
+      """)),
 
   # Whether Bash can run on the executor.
   # This is not always the case, for example when running on embedded systems.
