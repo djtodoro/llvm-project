@@ -888,6 +888,10 @@ parseStackLifetimeOptions(StringRef Params) {
   return Result;
 }
 
+Expected<bool> parseKCFIPassOptions(StringRef Params) {
+  return parseSinglePassOption(Params, "trap", "KCFI");
+}
+
 Expected<bool> parseDependenceAnalysisPrinterOptions(StringRef Params) {
   return parseSinglePassOption(Params, "normalized-results",
                                "DependenceAnalysisPrinter");

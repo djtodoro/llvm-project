@@ -29,6 +29,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Transforms/Instrumentation.h"
 #include <cstdint>
 #include <utility>
 
@@ -130,16 +131,17 @@ static void insertBoundsCheck(Value *Or, BuilderTy &IRB, GetTrapBBT GetTrapBB) {
     // If we have a constant zero, unconditionally branch.
     // FIXME: We should really handle this differently to bypass the splitting
     // the block.
-    BranchInst::Create(GetTrapBB(IRB), OldBB);
+    BranchInst::Create(GetTrapBB(IRB, Cont), OldBB);
     return;
   }
 
   // Create the conditional branch.
-  BranchInst::Create(GetTrapBB(IRB), Cont, Or, OldBB);
+  BranchInst::Create(GetTrapBB(IRB, Cont), Cont, Or, OldBB);
 }
 
 static bool addBoundsChecking(Function &F, TargetLibraryInfo &TLI,
-                              ScalarEvolution &SE) {
+                              ScalarEvolution &SE, bool Trap = true,
+                              bool Recover = false) {
   if (F.hasFnAttribute(Attribute::NoSanitizeBounds))
     return false;
 
@@ -180,27 +182,48 @@ static bool addBoundsChecking(Function &F, TargetLibraryInfo &TLI,
   // Create a trapping basic block on demand using a callback. Depending on
   // flags, this will either create a single block for the entire function or
   // will create a fresh block every time it is called.
-  BasicBlock *TrapBB = nullptr;
-  auto GetTrapBB = [&TrapBB](BuilderTy &IRB) {
-    if (TrapBB && SingleTrapBB)
-      return TrapBB;
+  BasicBlock *FailBB = nullptr;
+  auto GetTrapBB = [&FailBB, Trap, Recover](BuilderTy &IRB,
+                                            BasicBlock *Cont = nullptr) {
+    if (Trap && FailBB && SingleTrapBB && !Recover)
+      return FailBB;
 
     Function *Fn = IRB.GetInsertBlock()->getParent();
     // FIXME: This debug location doesn't make a lot of sense in the
     // `SingleTrapBB` case.
     auto DebugLoc = IRB.getCurrentDebugLocation();
     IRBuilder<>::InsertPointGuard Guard(IRB);
-    TrapBB = BasicBlock::Create(Fn->getContext(), "trap", Fn);
-    IRB.SetInsertPoint(TrapBB);
+    StringRef BlockName = Trap ? "trap" : "handle";
+    FailBB = BasicBlock::Create(Fn->getContext(), BlockName, Fn);
+    IRB.SetInsertPoint(FailBB);
 
-    auto *F = Intrinsic::getDeclaration(Fn->getParent(), Intrinsic::trap);
-    CallInst *TrapCall = IRB.CreateCall(F, {});
-    TrapCall->setDoesNotReturn();
-    TrapCall->setDoesNotThrow();
-    TrapCall->setDebugLoc(DebugLoc);
-    IRB.CreateUnreachable();
+    if (Trap) {
+      auto *F = Intrinsic::getDeclaration(Fn->getParent(), Intrinsic::trap);
+      CallInst *TrapCall = IRB.CreateCall(F, {});
+      TrapCall->setDoesNotReturn();
+      TrapCall->setDoesNotThrow();
+      TrapCall->setDebugLoc(DebugLoc);
+      IRB.CreateUnreachable();
+    } else {
+      FunctionCallee WarningFn;
+      StringRef WarningFnName =
+          Recover ? "__ubsan_handle_out_of_bounds_minimal"
+                  : "__ubsan_handle_out_of_bounds_minimal_abort";
+      Value *Data = emitDebugLocData(DebugLoc, *(Fn->getParent()), IRB);
+      WarningFn = Fn->getParent()->getOrInsertFunction(
+          WarningFnName, IRB.getVoidTy(), Data->getType());
+      CallInst *Call = IRB.CreateCall(WarningFn, Data);
+      Call->setDebugLoc(DebugLoc);
+      Call->setCannotMerge();
+      if (!Recover) {
+        Call->setDoesNotReturn();
+        IRB.CreateUnreachable();
+      } else {
+        BranchInst::Create(Cont, FailBB);
+      }
+    }
 
-    return TrapBB;
+    return FailBB;
   };
 
   // Add the checks.
@@ -213,11 +236,15 @@ static bool addBoundsChecking(Function &F, TargetLibraryInfo &TLI,
   return !TrapInfo.empty();
 }
 
+BoundsCheckingPass::BoundsCheckingPass() : Trap(true), Recover(false) {}
+BoundsCheckingPass::BoundsCheckingPass(bool Trap, bool Recover)
+    : Trap(Trap), Recover(Recover) {}
+
 PreservedAnalyses BoundsCheckingPass::run(Function &F, FunctionAnalysisManager &AM) {
   auto &TLI = AM.getResult<TargetLibraryAnalysis>(F);
   auto &SE = AM.getResult<ScalarEvolutionAnalysis>(F);
 
-  if (!addBoundsChecking(F, TLI, SE))
+  if (!addBoundsChecking(F, TLI, SE, Trap, Recover))
     return PreservedAnalyses::all();
 
   return PreservedAnalyses::none();

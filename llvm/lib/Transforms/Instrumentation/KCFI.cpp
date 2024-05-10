@@ -103,7 +103,23 @@ PreservedAnalyses KCFIPass::run(Function &F, FunctionAnalysisManager &AM) {
     Instruction *ThenTerm =
         SplitBlockAndInsertIfThen(Test, Call, false, VeryUnlikelyWeights);
     Builder.SetInsertPoint(ThenTerm);
-    Builder.CreateCall(Intrinsic::getDeclaration(&M, Intrinsic::trap));
+    auto DebugLoc = Builder.getCurrentDebugLocation();
+    if (Trap) {
+      CallInst *TrapCall =
+          Builder.CreateCall(Intrinsic::getDeclaration(&M, Intrinsic::trap));
+      TrapCall->setDoesNotReturn();
+      TrapCall->setDoesNotThrow();
+      TrapCall->setDebugLoc(DebugLoc);
+      Builder.CreateUnreachable();
+    } else {
+      FunctionCallee WarningFn;
+      WarningFn = M.getOrInsertFunction(
+          "__ubsan_handle_kcfi", Builder.getVoidTy(), Builder.getInt8PtrTy());
+      Value *Data = emitDebugLocData(DebugLoc, M, Builder);
+      CallInst *Call = Builder.CreateCall(WarningFn, Data);
+      Call->setDebugLoc(DebugLoc);
+      Call->setCannotMerge();
+    }
     ++NumKCFIChecks;
   }
 

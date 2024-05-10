@@ -637,7 +637,7 @@ static OptimizationLevel mapToLevel(const CodeGenOptions &Opts) {
 }
 
 static void addKCFIPass(const Triple &TargetTriple, const LangOptions &LangOpts,
-                        PassBuilder &PB) {
+                        PassBuilder &PB, const CodeGenOptions &CodeGenOpts) {
   // If the back-end supports KCFI operand bundle lowering, skip KCFIPass.
   if (TargetTriple.getArch() == llvm::Triple::x86_64 ||
       TargetTriple.isAArch64(64))
@@ -647,8 +647,10 @@ static void addKCFIPass(const Triple &TargetTriple, const LangOptions &LangOpts,
   PB.registerOptimizerLastEPCallback(
       [&](ModulePassManager &MPM, OptimizationLevel Level) {
         if (Level == OptimizationLevel::O0 &&
-            LangOpts.Sanitize.has(SanitizerKind::KCFI))
-          MPM.addPass(createModuleToFunctionPassAdaptor(KCFIPass()));
+            LangOpts.Sanitize.has(SanitizerKind::KCFI)) {
+          bool Trap = CodeGenOpts.SanitizeTrap.has(SanitizerKind::KCFI);
+          MPM.addPass(createModuleToFunctionPassAdaptor(KCFIPass(Trap)));
+        }
       });
 
   // When optimizations are requested, run KCIFPass after InstCombine to
@@ -656,8 +658,10 @@ static void addKCFIPass(const Triple &TargetTriple, const LangOptions &LangOpts,
   PB.registerPeepholeEPCallback(
       [&](FunctionPassManager &FPM, OptimizationLevel Level) {
         if (Level != OptimizationLevel::O0 &&
-            LangOpts.Sanitize.has(SanitizerKind::KCFI))
-          FPM.addPass(KCFIPass());
+            LangOpts.Sanitize.has(SanitizerKind::KCFI)) {
+          bool Trap = CodeGenOpts.SanitizeTrap.has(SanitizerKind::KCFI);
+          FPM.addPass(KCFIPass(Trap));
+        }
       });
 }
 
@@ -956,17 +960,21 @@ void EmitAssemblyHelper::RunOptimizationPipeline(
 
     // Register callbacks to schedule sanitizer passes at the appropriate part
     // of the pipeline.
-    if (LangOpts.Sanitize.has(SanitizerKind::LocalBounds))
+    if (LangOpts.Sanitize.has(SanitizerKind::LocalBounds)) {
+      bool Trap = CodeGenOpts.SanitizeTrap.has(SanitizerKind::LocalBounds);
+      bool Recover =
+          CodeGenOpts.SanitizeRecover.has(SanitizerKind::LocalBounds);
       PB.registerScalarOptimizerLateEPCallback(
-          [](FunctionPassManager &FPM, OptimizationLevel Level) {
-            FPM.addPass(BoundsCheckingPass());
+          [Trap, Recover](FunctionPassManager &FPM, OptimizationLevel Level) {
+            FPM.addPass(BoundsCheckingPass(Trap, Recover));
           });
+    }
 
     // Don't add sanitizers if we are here from ThinLTO PostLink. That already
     // done on PreLink stage.
     if (!IsThinLTOPostLink) {
       addSanitizers(TargetTriple, CodeGenOpts, LangOpts, PB);
-      addKCFIPass(TargetTriple, LangOpts, PB);
+      addKCFIPass(TargetTriple, LangOpts, PB, CodeGenOpts);
     }
 
     if (std::optional<GCOVOptions> Options =

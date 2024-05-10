@@ -329,7 +329,6 @@ FUNCTION_PASS("nary-reassociate", NaryReassociatePass())
 FUNCTION_PASS("newgvn", NewGVNPass())
 FUNCTION_PASS("jump-threading", JumpThreadingPass())
 FUNCTION_PASS("partially-inline-libcalls", PartiallyInlineLibCallsPass())
-FUNCTION_PASS("kcfi", KCFIPass())
 FUNCTION_PASS("lcssa", LCSSAPass())
 FUNCTION_PASS("loop-data-prefetch", LoopDataPrefetchPass())
 FUNCTION_PASS("loop-load-elim", LoopLoadEliminationPass())
@@ -502,6 +501,13 @@ FUNCTION_PASS_WITH_PARAMS("print<da>",
                            },
                           parseDependenceAnalysisPrinterOptions,
                           "normalized-results")
+FUNCTION_PASS_WITH_PARAMS("kcfi",
+                          "KCFIPass",
+                           [](bool Trap) {
+                             return KCFIPass(Trap);
+                           },
+                          parseKCFIPassOptions,
+                          "trap")
 #undef FUNCTION_PASS_WITH_PARAMS
 
 #ifndef LOOPNEST_PASS
