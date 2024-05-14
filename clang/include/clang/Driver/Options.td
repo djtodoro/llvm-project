@@ -1874,6 +1874,11 @@ def fsanitize_cfi_icall_generalize_pointers : Flag<["-"], "fsanitize-cfi-icall-g
                                               Group<f_clang_Group>,
                                               HelpText<"Generalize pointers in CFI indirect call type signature checks">,
                                               MarshallingInfoFlag<CodeGenOpts<"SanitizeCfiICallGeneralizePointers">>;
+defm sanitize_kcfi_disable_check : BoolOption<"f", "sanitize-kcfi-disable-check",
+  CodeGenOpts<"KCFIDisableCheck">, DefaultFalse,
+  PosFlag<SetTrue, [CoreOption], "Disable">, NegFlag<SetFalse, [CoreOption], "Do not disable">,
+  BothFlags<[], " KCFI checks on calls in compilation unit">>,
+  Group<f_clang_Group>;
 defm sanitize_cfi_canonical_jump_tables : BoolOption<"f", "sanitize-cfi-canonical-jump-tables",
   CodeGenOpts<"SanitizeCfiCanonicalJumpTables">, DefaultFalse,
   PosFlag<SetTrue, [], "Make">, NegFlag<SetFalse, [CoreOption, NoXarchOption], "Do not make">,
