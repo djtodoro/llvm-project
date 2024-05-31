@@ -19,7 +19,7 @@
 namespace llvm {
 class KCFIPass : public PassInfoMixin<KCFIPass> {
 public:
-  KCFIPass(bool Trap) : Trap(Trap) {}
+  KCFIPass(bool Trap = true) : Trap(Trap) {}
   static bool isRequired() { return true; }
   PreservedAnalyses run(Function &F, FunctionAnalysisManager &AM);
 

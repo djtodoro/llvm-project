@@ -112,6 +112,7 @@ PreservedAnalyses KCFIPass::run(Function &F, FunctionAnalysisManager &AM) {
       TrapCall->setDoesNotThrow();
       TrapCall->setDebugLoc(DebugLoc);
       Builder.CreateUnreachable();
+      TrapCall->getParent()->getTerminator()->eraseFromParent();
     } else {
       FunctionCallee WarningFn;
       WarningFn = M.getOrInsertFunction(

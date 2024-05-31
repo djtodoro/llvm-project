@@ -70,7 +70,8 @@ static const SanitizerMask TrappingSupported =
     SanitizerKind::Nullability | SanitizerKind::LocalBounds |
     SanitizerKind::CFI | SanitizerKind::KCFI |
     SanitizerKind::FloatDivideByZero | SanitizerKind::ObjCCast;
-static const SanitizerMask TrappingDefault = SanitizerKind::CFI;
+static const SanitizerMask TrappingDefault =
+    SanitizerKind::CFI | SanitizerKind::KCFI;
 static const SanitizerMask CFIClasses =
     SanitizerKind::CFIVCall | SanitizerKind::CFINVCall |
     SanitizerKind::CFIMFCall | SanitizerKind::CFIDerivedCast |

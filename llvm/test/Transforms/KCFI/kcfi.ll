@@ -1,4 +1,4 @@
-; RUN: opt -S -passes=kcfi %s | FileCheck %s
+; RUN: opt -S -passes='kcfi<trap>' %s | FileCheck %s
 
 ; CHECK-LABEL: define void @f1(
 define void @f1(ptr noundef %x) {
@@ -7,8 +7,8 @@ define void @f1(ptr noundef %x) {
   ; CHECK-NEXT: %[[#ICMP:]] = icmp ne i32 %[[#LOAD]], 12345678
   ; CHECK-NEXT: br i1 %[[#ICMP]], label %[[#TRAP:]], label %[[#CALL:]], !prof ![[#WEIGHTS:]]
   ; CHECK:      [[#TRAP]]:
-  ; CHECK-NEXT: call void @llvm.trap()
-  ; CHECK-NEXT: br label %[[#CALL]]
+  ; CHECK-NEXT: call void @llvm.debugtrap()
+  ; CHECK-NEXT: unreachable
   ; CHECK:      [[#CALL]]:
   ; CHECK-NEXT: call void %x()
   ; CHECK-NOT:  [ "kcfi"(i32 12345678) ]

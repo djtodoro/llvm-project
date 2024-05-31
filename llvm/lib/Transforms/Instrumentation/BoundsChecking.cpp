@@ -109,9 +109,10 @@ static Value *getBoundsCheckCond(Value *Ptr, Value *InstVal,
 ///
 /// \p Or is the condition that should guard the trap.
 ///
-/// \p GetTrapBB is a callable that returns the trap BB to use on failure.
-template <typename GetTrapBBT>
-static void insertBoundsCheck(Value *Or, BuilderTy &IRB, GetTrapBBT GetTrapBB) {
+/// \p GetHandlerBB is a callable that returns the trap BB to use on failure.
+template <typename GetHandlerBBT>
+static void insertBoundsCheck(Value *Or, BuilderTy &IRB,
+                              GetHandlerBBT GetHandlerBB) {
   // check if the comparison is always false
   ConstantInt *C = dyn_cast_or_null<ConstantInt>(Or);
   if (C) {
@@ -131,12 +132,12 @@ static void insertBoundsCheck(Value *Or, BuilderTy &IRB, GetTrapBBT GetTrapBB) {
     // If we have a constant zero, unconditionally branch.
     // FIXME: We should really handle this differently to bypass the splitting
     // the block.
-    BranchInst::Create(GetTrapBB(IRB, Cont), OldBB);
+    BranchInst::Create(GetHandlerBB(IRB, Cont), OldBB);
     return;
   }
 
   // Create the conditional branch.
-  BranchInst::Create(GetTrapBB(IRB, Cont), Cont, Or, OldBB);
+  BranchInst::Create(GetHandlerBB(IRB, Cont), Cont, Or, OldBB);
 }
 
 static bool addBoundsChecking(Function &F, TargetLibraryInfo &TLI,
@@ -182,11 +183,11 @@ static bool addBoundsChecking(Function &F, TargetLibraryInfo &TLI,
   // Create a trapping basic block on demand using a callback. Depending on
   // flags, this will either create a single block for the entire function or
   // will create a fresh block every time it is called.
-  BasicBlock *FailBB = nullptr;
-  auto GetTrapBB = [&FailBB, Trap, Recover](BuilderTy &IRB,
-                                            BasicBlock *Cont = nullptr) {
-    if (Trap && FailBB && SingleTrapBB && !Recover)
-      return FailBB;
+  BasicBlock *TrapBB = nullptr;
+  auto GetHandlerBB = [&TrapBB, Trap, Recover](BuilderTy &IRB,
+                                               BasicBlock *Cont = nullptr) {
+    if (Trap && TrapBB && SingleTrapBB && !Recover)
+      return TrapBB;
 
     Function *Fn = IRB.GetInsertBlock()->getParent();
     // FIXME: This debug location doesn't make a lot of sense in the
@@ -194,8 +195,8 @@ static bool addBoundsChecking(Function &F, TargetLibraryInfo &TLI,
     auto DebugLoc = IRB.getCurrentDebugLocation();
     IRBuilder<>::InsertPointGuard Guard(IRB);
     StringRef BlockName = Trap ? "trap" : "handle";
-    FailBB = BasicBlock::Create(Fn->getContext(), BlockName, Fn);
-    IRB.SetInsertPoint(FailBB);
+    BasicBlock *HandleBB = BasicBlock::Create(Fn->getContext(), BlockName, Fn);
+    IRB.SetInsertPoint(HandleBB);
 
     if (Trap) {
       auto *F = Intrinsic::getDeclaration(Fn->getParent(), Intrinsic::trap);
@@ -219,26 +220,22 @@ static bool addBoundsChecking(Function &F, TargetLibraryInfo &TLI,
         Call->setDoesNotReturn();
         IRB.CreateUnreachable();
       } else {
-        BranchInst::Create(Cont, FailBB);
+        BranchInst::Create(Cont, HandleBB);
       }
     }
 
-    return FailBB;
+    return HandleBB;
   };
 
   // Add the checks.
   for (const auto &Entry : TrapInfo) {
     Instruction *Inst = Entry.first;
     BuilderTy IRB(Inst->getParent(), BasicBlock::iterator(Inst), TargetFolder(DL));
-    insertBoundsCheck(Entry.second, IRB, GetTrapBB);
+    insertBoundsCheck(Entry.second, IRB, GetHandlerBB);
   }
 
   return !TrapInfo.empty();
 }
-
-BoundsCheckingPass::BoundsCheckingPass() : Trap(true), Recover(false) {}
-BoundsCheckingPass::BoundsCheckingPass(bool Trap, bool Recover)
-    : Trap(Trap), Recover(Recover) {}
 
 PreservedAnalyses BoundsCheckingPass::run(Function &F, FunctionAnalysisManager &AM) {
   auto &TLI = AM.getResult<TargetLibraryAnalysis>(F);
