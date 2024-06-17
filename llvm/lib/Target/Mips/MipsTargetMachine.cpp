@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "NanoMipsTargetTransformInfo.h"
 #include "MipsTargetMachine.h"
 #include "MCTargetDesc/MipsABIInfo.h"
 #include "MCTargetDesc/MipsMCTargetDesc.h"
@@ -21,6 +20,8 @@
 #include "MipsSubtarget.h"
 #include "MipsTargetObjectFile.h"
 #include "MipsTargetTransformInfo.h"
+#include "NanoMipsTargetTransformInfo.h"
+#include "NanoMipsTrapOpt.h"
 #include "TargetInfo/MipsTargetInfo.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
@@ -38,6 +39,7 @@
 #include "llvm/IR/Function.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/MC/TargetRegistry.h"
+#include "llvm/Passes/PassBuilder.h"
 #include "llvm/Support/CodeGen.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
@@ -461,4 +463,10 @@ bool MipsPassConfig::addRegBankSelect() {
 bool MipsPassConfig::addGlobalInstructionSelect() {
   addPass(new InstructionSelect(getOptLevel()));
   return false;
+}
+void NanoMipsTargetMachine::registerPassBuilderCallbacks(PassBuilder &PB) {
+  PB.registerPeepholeEPCallback(
+      [=](FunctionPassManager &FPM, OptimizationLevel) {
+        FPM.addPass(NanoMipsTrapOptPass());
+      });
 }
