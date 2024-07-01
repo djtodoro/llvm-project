@@ -1373,6 +1373,10 @@ def int_ubsantrap : Intrinsic<[], [llvm_i8_ty],
 // to be finally converted back to the regular form, after issuing the warning
 def int_ubsantrap_unique : Intrinsic<[], [llvm_i8_ty, llvm_metadata_ty],
                               [IntrNoReturn, IntrCold, ImmArg<ArgIndex<0>>]>;
+// Same as int_ubsantrap_unique but intended to be removed instead of replaced
+// with a regular trap
+def int_ubsantrap_unique_return : Intrinsic<[], [llvm_i8_ty, llvm_metadata_ty],
+                              [IntrCold, ImmArg<ArgIndex<0>>]>;
 
 // Support for dynamic deoptimization (or de-specialization)
 def int_experimental_deoptimize : Intrinsic<[llvm_any_ty], [llvm_vararg_ty],

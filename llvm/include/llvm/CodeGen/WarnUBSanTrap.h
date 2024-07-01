@@ -18,6 +18,7 @@ class WarnUBSanTrapPass : public PassInfoMixin<WarnUBSanTrapPass> {
 
 public:
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM);
+  static bool isRequired() { return true; }
 };
 
 } // end namespace llvm
