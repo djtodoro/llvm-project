@@ -245,7 +245,7 @@ bool NMLoadStoreMultipleOpt::generateLoadStoreMultiple(MachineBasicBlock &MBB,
     }
   }
 
-  SmallVector<InstrList, 3> Candidates;
+  SmallVector<Candidate, 3> Candidates;
   InstrList Sequence;
   size_t GapSize = 0;
   size_t SeqSize = 0;
