@@ -96,7 +96,11 @@ def GENERIC_RV64 : RISCVProcessorModel<"generic-rv64",
 def GENERIC : RISCVTuneProcessorModel<"generic", NoSchedModel>, GenericTuneInfo;
 
 def MIPS_P8700 : RISCVProcessorModel<"mips-p8700",
+<<<<<<< HEAD
                                      MIPSP8700Model,
+=======
+                                     NoSchedModel,
+>>>>>>> 856ac2134c89 ([RISCV] Add MIPS P8700 processor)
                                      [Feature64Bit,
                                       FeatureStdExtI,
                                       FeatureStdExtM,
