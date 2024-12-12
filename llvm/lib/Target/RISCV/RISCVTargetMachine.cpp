@@ -146,6 +146,7 @@ extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeRISCVTarget() {
   initializeRISCVMoveMergePass(*PR);
   initializeRISCVPushPopOptPass(*PR);
   initializeRISCVLoadStoreOptPass(*PR);
+  initializeRISCVRemoveBackToBackBranchesPass(*PR);
 }
 
 static StringRef computeDataLayout(const Triple &TT,
@@ -567,6 +568,7 @@ void RISCVPassConfig::addPreEmitPass() {
     addPass(createMachineCopyPropagationPass(true));
   addPass(&BranchRelaxationPassID);
   addPass(createRISCVMakeCompressibleOptPass());
+  addPass(createRISCVRemoveBackToBackBranches());
 }
 
 void RISCVPassConfig::addPreEmitPass2() {
