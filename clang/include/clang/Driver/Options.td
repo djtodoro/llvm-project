@@ -4901,6 +4901,7 @@ def msave_restore : Flag<["-"], "msave-restore">, Group<m_riscv_Features_Group>,
 def mno_save_restore : Flag<["-"], "mno-save-restore">, Group<m_riscv_Features_Group>,
   HelpText<"Disable using library calls for save and restore">;
 } // let Flags = [TargetSpecific]
+def mremove_back_to_back_branches : Flag<["-"], "mremove_back_to_back_branches">, Group<m_riscv_Features_Group>;
 let Flags = [TargetSpecific] in {
 def menable_experimental_extensions : Flag<["-"], "menable-experimental-extensions">, Group<m_Group>,
   HelpText<"Enable use of experimental RISC-V extensions.">;
