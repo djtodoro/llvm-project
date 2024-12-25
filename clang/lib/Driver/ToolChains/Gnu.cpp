@@ -1396,7 +1396,7 @@ static bool findMipsMtiMultilibs(const Driver &D,
                            .flag("-msoft-float")
                            .flag("-mnan=2008", /*Disallow=*/true)
                            .flag("-mmicromips");
-    auto ElNanoSoft = MultilibBuilder("/nanomips-r6-soft-small")
+    auto ElNanoSoft = MultilibBuilder("/nanomips-r6-soft-newlib")
                           .flag("-EL")
                           .flag("-msoft-float")
                           .flag("-mnan=2008", /*Disallow=*/true)
