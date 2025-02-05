@@ -134,16 +134,16 @@ bool RISCVLoadStoreOpt::tryConvertToLdStPair(
   default:
     return false;
   case RISCV::SW:
-    PairOpc = RISCV::SWP;
+    PairOpc = RISCV::MIPS_SWP;
     break;
   case RISCV::LW:
-    PairOpc = RISCV::LWP;
+    PairOpc = RISCV::MIPS_LWP;
     break;
   case RISCV::SD:
-    PairOpc = RISCV::SDP;
+    PairOpc = RISCV::MIPS_SDP;
     break;
   case RISCV::LD:
-    PairOpc = RISCV::LDP;
+    PairOpc = RISCV::MIPS_LDP;
     break;
   }
 
