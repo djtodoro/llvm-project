@@ -190,6 +190,7 @@ public:
   }  
   bool shouldRemoveBackToBackBranches() const;
   bool useLoadStorePairs() const;
+  bool useMIPSLoadStoreBonding() const;
   bool useCCMovInsn() const;
   unsigned getFLen() const {
     if (HasStdExtD)
