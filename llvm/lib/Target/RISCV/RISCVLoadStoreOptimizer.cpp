@@ -22,7 +22,7 @@
 using namespace llvm;
 
 #define DEBUG_TYPE "riscv-load-store-opt"
-#define RISCV_LOAD_STORE_OPT_NAME "RISC-V Load / Store Optimizer"
+#define RISCV_LOAD_STORE_OPT_NAME "RISCV Load / Store Optimizer"
 namespace {
 
 struct RISCVLoadStoreOpt : public MachineFunctionPass {
@@ -107,16 +107,12 @@ bool RISCVLoadStoreOpt::runOnMachineFunction(MachineFunction &Fn) {
 // instruction.
 bool RISCVLoadStoreOpt::tryToPairLdStInst(MachineBasicBlock::iterator &MBBI) {
   MachineInstr &MI = *MBBI;
-
-  // If this is volatile, it is not a candidate.
-  if (MI.hasOrderedMemoryRef())
-    return false;
+  MachineBasicBlock::iterator E = MI.getParent()->end();
 
   if (!TII->isLdStSafeToPair(MI, TRI))
     return false;
 
   // Look ahead for a pairable instruction.
-  MachineBasicBlock::iterator E = MI.getParent()->end();
   bool MergeForward;
   MachineBasicBlock::iterator Paired = findMatchingInsn(MBBI, MergeForward);
   if (Paired != E) {
@@ -205,8 +201,8 @@ RISCVLoadStoreOpt::findMatchingInsn(MachineBasicBlock::iterator I,
   bool MayLoad = FirstMI.mayLoad();
   Register Reg = FirstMI.getOperand(0).getReg();
   Register BaseReg = FirstMI.getOperand(1).getReg();
-  int64_t Offset = FirstMI.getOperand(2).getImm();
-  int64_t OffsetStride = (*FirstMI.memoperands_begin())->getSize().getValue();
+  int Offset = FirstMI.getOperand(2).getImm();
+  int OffsetStride = (*FirstMI.memoperands_begin())->getSize().getValue();
 
   MergeForward = false;
 
@@ -230,9 +226,10 @@ RISCVLoadStoreOpt::findMatchingInsn(MachineBasicBlock::iterator I,
     if (MI.getOpcode() == FirstMI.getOpcode() &&
         TII->isLdStSafeToPair(MI, TRI)) {
       Register MIBaseReg = MI.getOperand(1).getReg();
-      int64_t MIOffset = MI.getOperand(2).getImm();
+      int MIOffset = MI.getOperand(2).getImm();
 
       if (BaseReg == MIBaseReg) {
+
         if ((Offset != MIOffset + OffsetStride) &&
             (Offset + OffsetStride != MIOffset)) {
           LiveRegUnits::accumulateUsedDefed(MI, ModifiedRegUnits, UsedRegUnits,
@@ -352,21 +349,12 @@ RISCVLoadStoreOpt::mergePairedInsns(MachineBasicBlock::iterator I,
     First = InsertionPoint;
   }
 
-  // TODO: Double check if we should create bundles for non pairable
-  // instructions. The instructions are still bundled together, preserving
-  // their proximity and the intent of keeping related memory accesses
-  // together. This bundling can help subsequent passes maintain any implicit
-  // ordering or avoid reordering that might violate memory semantics.
-  if (!tryConvertToLdStPair(First, Second)) {
+  if (!tryConvertToLdStPair(First, Second))
     finalizeBundle(MBB, First.getInstrIterator(),
                    std::next(Second).getInstrIterator());
-    LLVM_DEBUG(dbgs() << "Was not able to pair:\n    ");
-    LLVM_DEBUG(prev_nodbg(NextI, MBB.begin())->print(dbgs()));
-  } else {
-    LLVM_DEBUG(dbgs() << "Bonding pair load/store:\n    ");
-    LLVM_DEBUG(prev_nodbg(NextI, MBB.begin())->print(dbgs()));
-  }
 
+  LLVM_DEBUG(dbgs() << "Bonding pair load/store:\n    ");
+  LLVM_DEBUG(prev_nodbg(NextI, MBB.begin())->print(dbgs()));
   return NextI;
 }
 
