@@ -171,16 +171,44 @@ bool RISCVLoadStoreOpt::tryConvertToLdStPair(
   MachineFunction *MF = First->getMF();
   const MachineMemOperand *MMO = *First->memoperands_begin();
   Align MMOAlign = MMO->getAlign();
-  if (const PseudoSourceValue *Source = MMO->getPseudoValue())
+
+  // First->dump();
+  // Second->dump();
+
+  // llvm::outs() << "MMOAlign initial: " << MMOAlign.value() << '\n';
+
+  // if (const PseudoSourceValue *Source = MMO->getPseudoValue())
+  //   if (Source->kind() == PseudoSourceValue::FixedStack)
+  //     MMOAlign = MF->getSubtarget().getFrameLowering()->getStackAlign();
+
+  // llvm::outs() << "MMOAlign after psv: " << MMOAlign.value() << '\n';
+
+  // llvm::outs() << "Align(MMO->getSize().getValue() * 2) "
+  //             << Align(MMO->getSize().getValue() * 2).value() << "\n";
+
+  // if (MMOAlign < Align(MMO->getSize().getValue() * 2))
+  //   return false;
+
+  // The stack pointer shall be aligned to a 128-bit per ABI.
+  if (const PseudoSourceValue *Source = MMO->getPseudoValue()) {
     if (Source->kind() == PseudoSourceValue::FixedStack)
       MMOAlign = MF->getSubtarget().getFrameLowering()->getStackAlign();
+  }
 
-  if (MMOAlign < Align(MMO->getSize().getValue() * 2))
+  if (MMOAlign != 16) {
+    // llvm::outs() << "MMOAlign false: " << MMOAlign.value() << '\n';        
     return false;
+  }
+
+  // llvm::outs() << "MMOAlign initial: " << MMOAlign.value() << '\n';
+
   int64_t Offset = First->getOperand(2).getImm();
+  // llvm::outs() << "isAligned(Align(MMO->getSize().getValue()), Offset) "
+  //              << isAligned(Align(MMO->getSize().getValue()), Offset) << "\n\n";
   if (!isUInt<7>(Offset) ||
       !isAligned(Align(MMO->getSize().getValue()), Offset))
     return false;
+
   MachineInstrBuilder MIB = BuildMI(
       *MF,
       First->getDebugLoc().get() ? First->getDebugLoc() : Second->getDebugLoc(),
