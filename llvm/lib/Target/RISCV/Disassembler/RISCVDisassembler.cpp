@@ -490,6 +490,13 @@ static DecodeStatus decodeRTZArg(MCInst &Inst, uint32_t Imm, int64_t Address,
   return MCDisassembler::Success;
 }
 
+static DecodeStatus decodeRVIShiftImm(MCInst &MI, unsigned Insn,
+                                      uint64_t Address,
+                                      const MCDisassembler *Decoder);
+static DecodeStatus decodeRVR(MCInst &MI, unsigned Insn,
+                              uint64_t Address,
+                              const MCDisassembler *Decoder);
+
 static DecodeStatus decodeRVCInstrRdRs1ImmZero(MCInst &Inst, uint32_t Insn,
                                                uint64_t Address,
                                                const MCDisassembler *Decoder);
@@ -532,6 +539,51 @@ static DecodeStatus decodeCSSPushPopchk(MCInst &Inst, uint32_t Insn,
                                         const MCDisassembler *Decoder);
 
 #include "RISCVGenDisassemblerTables.inc"
+
+/// Minimal “shift-imm” decode: extracts RD, RS1, imm5 from a 32-bit instruction.
+/// For RORI instructions. 
+static DecodeStatus decodeRVIShiftImm(MCInst &MI, unsigned Insn,
+                                      uint64_t Address,
+                                      const MCDisassembler *Decoder) {
+  DecodeStatus S = MCDisassembler::Success;
+
+  // RD is bits [11:7]
+  unsigned RD = fieldFromInstruction(Insn, 7, 5);
+  if (!Check(S, DecodeGPRRegisterClass(MI, RD, Address, Decoder)))
+    return MCDisassembler::Fail;
+
+  // RS1 is bits [19:15]
+  unsigned RS1 = fieldFromInstruction(Insn, 15, 5);
+  if (!Check(S, DecodeGPRRegisterClass(MI, RS1, Address, Decoder)))
+    return MCDisassembler::Fail;
+
+  // The shift immediate is 5 bits in [24:20].
+  unsigned ShAmt = fieldFromInstruction(Insn, 20, 5);
+  MI.addOperand(MCOperand::createImm(ShAmt));
+
+  return S;
+}
+
+/// Minimal “R-type” decode for ROL, ROR: extracts RD, RS1, RS2 from 32-bit insn.
+static DecodeStatus decodeRVR(MCInst &MI, unsigned Insn,
+                              uint64_t Address,
+                              const MCDisassembler *Decoder) {
+  DecodeStatus S = MCDisassembler::Success;
+
+  unsigned RD = fieldFromInstruction(Insn, 7, 5);
+  if (!Check(S, DecodeGPRRegisterClass(MI, RD, Address, Decoder)))
+    return MCDisassembler::Fail;
+
+  unsigned RS1 = fieldFromInstruction(Insn, 15, 5);
+  if (!Check(S, DecodeGPRRegisterClass(MI, RS1, Address, Decoder)))
+    return MCDisassembler::Fail;
+
+  unsigned RS2 = fieldFromInstruction(Insn, 20, 5);
+  if (!Check(S, DecodeGPRRegisterClass(MI, RS2, Address, Decoder)))
+    return MCDisassembler::Fail;
+
+  return S;
+}
 
 static DecodeStatus decodeRVCInstrRdRs1ImmZero(MCInst &Inst, uint32_t Insn,
                                                uint64_t Address,
@@ -740,6 +792,7 @@ static constexpr DecoderListEntry DecoderList32[]{
     {DecoderTableXmipscmov32,
      {RISCV::FeatureVendorXMIPSCMov},
      "MIPS mips.ccmov"},
+    {DecoderTableXsecure32, {RISCV::FeatureVendorXSecure}, "XSecure"},
     // Standard Extensions
     {DecoderTableXCV32, XCVFeatureGroup, "CORE-V extensions"},
     {DecoderTableXqci32, XqciFeatureGroup, "Qualcomm uC Extensions"},

@@ -123,6 +123,14 @@ def MIPS_P8700 : RISCVProcessorModel<"mips-p8700",
                                       FeatureVendorXMIPSLSP],
                                      [TuneMIPSP8700]>;
 
+def ATTORV32 : RISCVProcessorModel<"attorv32",
+                                     NoSchedModel,
+                                     [Feature32Bit,
+                                      FeatureStdExtI,
+                                      FeatureStdExtC,
+                                      FeatureVendorXSecure],
+                                     [TuneAttorv32]>;
+
 def ROCKET_RV32 : RISCVProcessorModel<"rocket-rv32",
                                       RocketModel,
                                       [Feature32Bit,

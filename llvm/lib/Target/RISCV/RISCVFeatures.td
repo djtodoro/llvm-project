@@ -1616,6 +1616,17 @@ def TuneMIPSP8700
     : SubtargetFeature<"mips-p8700", "RISCVProcFamily", "MIPSP8700",
                        "MIPS p8700 processor">;
 
+// Vendor XSecure extension
+def FeatureVendorXSecure
+    : RISCVExtension<1, 0, "XSecure rotate instructions">;
+def HasVendorXSecure
+    : Predicate<"Subtarget->hasVendorXSecure()">,
+      AssemblerPredicate<(all_of FeatureVendorXSecure),
+                         "'XSecure' (Custom rotate instructions) ">;
+def TuneAttorv32
+    : SubtargetFeature<"attorv32", "RISCVProcFamily", "ATTORV32",
+                       "attorv32 mini processor">;
+
 def TuneSiFive7 : SubtargetFeature<"sifive7", "RISCVProcFamily", "SiFive7",
                                    "SiFive 7-Series processors">;
 
