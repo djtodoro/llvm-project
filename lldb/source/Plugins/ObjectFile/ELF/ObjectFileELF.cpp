@@ -304,11 +304,14 @@ static uint32_t mipsVariantFromElfFlags (const elf::ELFHeader &header) {
 
 static uint32_t riscvVariantFromElfFlags(const elf::ELFHeader &header) {
   uint32_t fileclass = header.e_ident[EI_CLASS];
+  uint32_t endian = header.e_ident[EI_DATA];
   switch (fileclass) {
   case llvm::ELF::ELFCLASS32:
-    return ArchSpec::eRISCVSubType_riscv32;
+    return (endian == ELFDATA2LSB) ? ArchSpec::eRISCVSubType_riscv32
+                                   : ArchSpec::eRISCVSubType_riscv32be;
   case llvm::ELF::ELFCLASS64:
-    return ArchSpec::eRISCVSubType_riscv64;
+    return (endian == ELFDATA2LSB) ? ArchSpec::eRISCVSubType_riscv64
+                                   : ArchSpec::eRISCVSubType_riscv64be;
   default:
     return ArchSpec::eRISCVSubType_unknown;
   }
@@ -1415,7 +1418,9 @@ size_t ObjectFileELF::GetSectionHeaderInfo(SectionHeaderColl &section_headers,
   }
 
   if (arch_spec.GetMachine() == llvm::Triple::riscv32 ||
-      arch_spec.GetMachine() == llvm::Triple::riscv64) {
+      arch_spec.GetMachine() == llvm::Triple::riscv64 ||
+      arch_spec.GetMachine() == llvm::Triple::riscv32be ||
+      arch_spec.GetMachine() == llvm::Triple::riscv64be) {
     uint32_t flags = arch_spec.GetFlags();
 
     if (header.e_flags & llvm::ELF::EF_RISCV_RVC)

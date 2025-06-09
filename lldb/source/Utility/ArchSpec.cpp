@@ -232,6 +232,10 @@ static const CoreDefinition g_core_definitions[] = {
      "riscv32"},
     {eByteOrderLittle, 8, 2, 4, llvm::Triple::riscv64, ArchSpec::eCore_riscv64,
      "riscv64"},
+    {eByteOrderBig, 4, 2, 4, llvm::Triple::riscv32be, ArchSpec::eCore_riscv32be,
+     "riscv32be"},
+    {eByteOrderBig, 8, 2, 4, llvm::Triple::riscv64be, ArchSpec::eCore_riscv64be,
+     "riscv64be"},
 
     {eByteOrderLittle, 4, 4, 4, llvm::Triple::loongarch32,
      ArchSpec::eCore_loongarch32, "loongarch32"},
@@ -428,6 +432,10 @@ static const ArchDefinitionEntry g_elf_arch_entries[] = {
      ArchSpec::eRISCVSubType_riscv32, 0xFFFFFFFFu, 0xFFFFFFFFu}, // riscv32
     {ArchSpec::eCore_riscv64, llvm::ELF::EM_RISCV,
      ArchSpec::eRISCVSubType_riscv64, 0xFFFFFFFFu, 0xFFFFFFFFu}, // riscv64
+    {ArchSpec::eCore_riscv32be, llvm::ELF::EM_RISCV,
+     ArchSpec::eRISCVSubType_riscv32be, 0xFFFFFFFFu, 0xFFFFFFFFu}, // riscv32be
+    {ArchSpec::eCore_riscv64be, llvm::ELF::EM_RISCV,
+     ArchSpec::eRISCVSubType_riscv64be, 0xFFFFFFFFu, 0xFFFFFFFFu}, // riscv64be
     {ArchSpec::eCore_loongarch32, llvm::ELF::EM_LOONGARCH,
      ArchSpec::eLoongArchSubType_loongarch32, 0xFFFFFFFFu,
      0xFFFFFFFFu}, // loongarch32

@@ -105,6 +105,8 @@ public:
     eRISCVSubType_unknown,
     eRISCVSubType_riscv32,
     eRISCVSubType_riscv64,
+    eRISCVSubType_riscv32be,
+    eRISCVSubType_riscv64be,
   };
 
   enum LoongArcheflags {
@@ -223,6 +225,8 @@ public:
 
     eCore_riscv32,
     eCore_riscv64,
+    eCore_riscv32be,
+    eCore_riscv64be,
 
     eCore_loongarch32,
     eCore_loongarch64,
