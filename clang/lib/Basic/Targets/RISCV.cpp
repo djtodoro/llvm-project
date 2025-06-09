@@ -146,8 +146,7 @@ static unsigned getVersionValue(unsigned MajorVersion, unsigned MinorVersion) {
 void RISCVTargetInfo::getTargetDefines(const LangOptions &Opts,
                                        MacroBuilder &Builder) const {
   Builder.defineMacro("__riscv");
-  bool Is64Bit = getTriple().isRISCV64();
-  Builder.defineMacro("__riscv_xlen", Is64Bit ? "64" : "32");
+  Builder.defineMacro("__riscv_xlen", getTriple().isRISCV64() ? "64" : "32");
   StringRef CodeModel = getTargetOpts().CodeModel;
   unsigned FLen = ISAInfo->getFLen();
   unsigned MinVLen = ISAInfo->getMinVLen();
@@ -197,7 +196,7 @@ void RISCVTargetInfo::getTargetDefines(const LangOptions &Opts,
     Builder.defineMacro("__GCC_HAVE_SYNC_COMPARE_AND_SWAP_1");
     Builder.defineMacro("__GCC_HAVE_SYNC_COMPARE_AND_SWAP_2");
     Builder.defineMacro("__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4");
-    if (Is64Bit)
+    if (getTriple().isRISCV64())
       Builder.defineMacro("__GCC_HAVE_SYNC_COMPARE_AND_SWAP_8");
   }
 
@@ -233,7 +232,7 @@ void RISCVTargetInfo::getTargetDefines(const LangOptions &Opts,
     Builder.defineMacro("__riscv_misaligned_avoid");
 
   if (ISAInfo->hasExtension("e")) {
-    if (Is64Bit)
+    if (getTriple().isRISCV64())
       Builder.defineMacro("__riscv_64e");
     else
       Builder.defineMacro("__riscv_32e");

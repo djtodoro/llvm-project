@@ -163,12 +163,16 @@ void RISCV::Linker::ConstructJob(Compilation &C, const JobAction &JA,
   if (Args.hasArg(options::OPT_mno_relax))
     CmdArgs.push_back("--no-relax");
 
-  bool IsRV64 = ToolChain.getArch() == llvm::Triple::riscv64;
   CmdArgs.push_back("-m");
-  if (IsRV64) {
+  if (ToolChain.getArch() == llvm::Triple::riscv64) {
     CmdArgs.push_back("elf64lriscv");
-  } else {
+  } else if (ToolChain.getArch() == llvm::Triple::riscv64be) {
+    CmdArgs.push_back("elf64briscv");
+  } else if (ToolChain.getArch() == llvm::Triple::riscv32) {
     CmdArgs.push_back("elf32lriscv");
+  } else {
+    // Handle llvm::Triple::riscv32be.
+    CmdArgs.push_back("elf32briscv");
   }
   CmdArgs.push_back("-X");
 
