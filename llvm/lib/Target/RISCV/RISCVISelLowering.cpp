@@ -8000,6 +8000,10 @@ SDValue RISCVTargetLowering::LowerOperation(SDValue Op,
       Chain = DAG.getNode(ISD::TokenFactor, DL, MVT::Other, Lo.getValue(1),
                           Hi.getValue(1));
 
+      // For big-endian, swap the order of Lo and Hi.
+      if (!Subtarget.isLittleEndian())
+        std::swap(Lo, Hi);
+
       SDValue Pair = DAG.getNode(RISCVISD::BuildPairF64, DL, MVT::f64, Lo, Hi);
       return DAG.getMergeValues({Pair, Chain}, DL);
     }
@@ -8061,15 +8065,22 @@ SDValue RISCVTargetLowering::LowerOperation(SDValue Op,
       SDValue Split = DAG.getNode(RISCVISD::SplitF64, DL,
                                   DAG.getVTList(MVT::i32, MVT::i32), StoredVal);
 
-      SDValue Lo = DAG.getStore(Chain, DL, Split.getValue(0), BasePtr,
+      SDValue Lo = Split.getValue(0);
+      SDValue Hi = Split.getValue(1);
+
+      // For big-endian, swap the order of Lo and Hi before storing.
+      if (!Subtarget.isLittleEndian())
+        std::swap(Lo, Hi);
+
+      SDValue LoStore = DAG.getStore(Chain, DL, Lo, BasePtr,
                                 Store->getPointerInfo(), Store->getBaseAlign(),
                                 Store->getMemOperand()->getFlags());
       BasePtr = DAG.getObjectPtrOffset(DL, BasePtr, TypeSize::getFixed(4));
-      SDValue Hi = DAG.getStore(Chain, DL, Split.getValue(1), BasePtr,
+      SDValue HiStore = DAG.getStore(Chain, DL, Hi, BasePtr,
                                 Store->getPointerInfo().getWithOffset(4),
                                 Store->getBaseAlign(),
                                 Store->getMemOperand()->getFlags());
-      return DAG.getNode(ISD::TokenFactor, DL, MVT::Other, Lo, Hi);
+      return DAG.getNode(ISD::TokenFactor, DL, MVT::Other, LoStore, HiStore);
     }
     if (VT == MVT::i64) {
       assert(Subtarget.hasStdExtZilsd() && !Subtarget.is64Bit() &&
