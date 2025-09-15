@@ -14749,8 +14749,15 @@ void RISCVTargetLowering::ReplaceNodeResults(SDNode *N,
                Subtarget.hasStdExtDOrZdinx()) {
       SDValue NewReg = DAG.getNode(RISCVISD::SplitF64, DL,
                                    DAG.getVTList(MVT::i32, MVT::i32), Op0);
-      SDValue RetReg = DAG.getNode(ISD::BUILD_PAIR, DL, MVT::i64,
-                                   NewReg.getValue(0), NewReg.getValue(1));
+      SDValue Lo = NewReg.getValue(0);
+      SDValue Hi = NewReg.getValue(1);
+      // For big-endian, swap the order when building the i64 pair.
+      // Note: This specific path (BITCAST f64 to i64 on RV32 with D extension)
+      // is difficult to test as it gets optimized away in most cases.
+      // TODO: Add test for this.
+      if (!Subtarget.isLittleEndian())
+        std::swap(Lo, Hi);
+      SDValue RetReg = DAG.getNode(ISD::BUILD_PAIR, DL, MVT::i64, Lo, Hi);
       Results.push_back(RetReg);
     } else if (!VT.isVector() && Op0VT.isFixedLengthVector() &&
                isTypeLegal(Op0VT)) {
@@ -21749,14 +21756,27 @@ static MachineBasicBlock *emitSplitF64Pseudo(MachineInstr &MI,
       MF.getMachineMemOperand(MPI, MachineMemOperand::MOLoad, 4, Align(8));
   MachineMemOperand *MMOHi = MF.getMachineMemOperand(
       MPI.getWithOffset(4), MachineMemOperand::MOLoad, 4, Align(8));
-  BuildMI(*BB, MI, DL, TII.get(RISCV::LW), LoReg)
-      .addFrameIndex(FI)
-      .addImm(0)
-      .addMemOperand(MMOLo);
-  BuildMI(*BB, MI, DL, TII.get(RISCV::LW), HiReg)
-      .addFrameIndex(FI)
-      .addImm(4)
-      .addMemOperand(MMOHi);
+  
+  // For big-endian, the high part is at offset 0 and the low part at offset 4.
+  if (!Subtarget.isLittleEndian()) {
+    BuildMI(*BB, MI, DL, TII.get(RISCV::LW), HiReg)
+        .addFrameIndex(FI)
+        .addImm(0)
+        .addMemOperand(MMOLo);
+    BuildMI(*BB, MI, DL, TII.get(RISCV::LW), LoReg)
+        .addFrameIndex(FI)
+        .addImm(4)
+        .addMemOperand(MMOHi);
+  } else {
+    BuildMI(*BB, MI, DL, TII.get(RISCV::LW), LoReg)
+        .addFrameIndex(FI)
+        .addImm(0)
+        .addMemOperand(MMOLo);
+    BuildMI(*BB, MI, DL, TII.get(RISCV::LW), HiReg)
+        .addFrameIndex(FI)
+        .addImm(4)
+        .addMemOperand(MMOHi);
+  }
   MI.eraseFromParent(); // The pseudo instruction is gone now.
   return BB;
 }
@@ -21783,16 +21803,31 @@ static MachineBasicBlock *emitBuildPairF64Pseudo(MachineInstr &MI,
       MF.getMachineMemOperand(MPI, MachineMemOperand::MOStore, 4, Align(8));
   MachineMemOperand *MMOHi = MF.getMachineMemOperand(
       MPI.getWithOffset(4), MachineMemOperand::MOStore, 4, Align(8));
-  BuildMI(*BB, MI, DL, TII.get(RISCV::SW))
-      .addReg(LoReg, getKillRegState(MI.getOperand(1).isKill()))
-      .addFrameIndex(FI)
-      .addImm(0)
-      .addMemOperand(MMOLo);
-  BuildMI(*BB, MI, DL, TII.get(RISCV::SW))
-      .addReg(HiReg, getKillRegState(MI.getOperand(2).isKill()))
-      .addFrameIndex(FI)
-      .addImm(4)
-      .addMemOperand(MMOHi);
+  
+  // For big-endian, store the high part at offset 0 and the low part at offset 4.
+  if (!Subtarget.isLittleEndian()) {
+    BuildMI(*BB, MI, DL, TII.get(RISCV::SW))
+        .addReg(HiReg, getKillRegState(MI.getOperand(2).isKill()))
+        .addFrameIndex(FI)
+        .addImm(0)
+        .addMemOperand(MMOLo);
+    BuildMI(*BB, MI, DL, TII.get(RISCV::SW))
+        .addReg(LoReg, getKillRegState(MI.getOperand(1).isKill()))
+        .addFrameIndex(FI)
+        .addImm(4)
+        .addMemOperand(MMOHi);
+  } else {
+    BuildMI(*BB, MI, DL, TII.get(RISCV::SW))
+        .addReg(LoReg, getKillRegState(MI.getOperand(1).isKill()))
+        .addFrameIndex(FI)
+        .addImm(0)
+        .addMemOperand(MMOLo);
+    BuildMI(*BB, MI, DL, TII.get(RISCV::SW))
+        .addReg(HiReg, getKillRegState(MI.getOperand(2).isKill()))
+        .addFrameIndex(FI)
+        .addImm(4)
+        .addMemOperand(MMOHi);
+  }
   TII.loadRegFromStackSlot(*BB, MI, DstReg, FI, DstRC, RI, Register());
   MI.eraseFromParent(); // The pseudo instruction is gone now.
   return BB;
@@ -22614,6 +22649,13 @@ static SDValue unpackF64OnRV32DSoftABI(SelectionDAG &DAG, SDValue Chain,
     RegInfo.addLiveIn(HiVA.getLocReg(), HiVReg);
     Hi = DAG.getCopyFromReg(Chain, DL, HiVReg, MVT::i32);
   }
+  
+  // For big-endian, swap the order of Lo and Hi when building the pair.
+  const RISCVSubtarget &Subtarget = DAG.getSubtarget<RISCVSubtarget>();
+  // TESTED with: CodeGen/RISCV/bigendian-double-bitmanip.ll
+  if (!Subtarget.isLittleEndian())
+    std::swap(Lo, Hi);
+  
   return DAG.getNode(RISCVISD::BuildPairF64, DL, MVT::f64, Lo, Hi);
 }
 
@@ -22985,6 +23027,10 @@ SDValue RISCVTargetLowering::LowerCall(CallLoweringInfo &CLI,
       SDValue Lo = SplitF64.getValue(0);
       SDValue Hi = SplitF64.getValue(1);
 
+      // For big-endian, swap the order of Lo and Hi when passing.
+      if (!Subtarget.isLittleEndian())
+        std::swap(Lo, Hi);
+
       Register RegLo = VA.getLocReg();
       RegsToPass.push_back(std::make_pair(RegLo, Lo));
 
@@ -23212,8 +23258,14 @@ SDValue RISCVTargetLowering::LowerCall(CallLoweringInfo &CLI,
                                              MVT::i32, Glue);
       Chain = RetValue2.getValue(1);
       Glue = RetValue2.getValue(2);
-      RetValue = DAG.getNode(RISCVISD::BuildPairF64, DL, MVT::f64, RetValue,
-                             RetValue2);
+      
+      // For big-endian, swap the order when building the pair.
+      SDValue Lo = RetValue;
+      SDValue Hi = RetValue2;
+      if (!Subtarget.isLittleEndian())
+        std::swap(Lo, Hi);
+      
+      RetValue = DAG.getNode(RISCVISD::BuildPairF64, DL, MVT::f64, Lo, Hi);
     } else
       RetValue = convertLocVTToValVT(DAG, RetValue, VA, DL, Subtarget);
 
@@ -23279,6 +23331,11 @@ RISCVTargetLowering::LowerReturn(SDValue Chain, CallingConv::ID CallConv,
                                      DAG.getVTList(MVT::i32, MVT::i32), Val);
       SDValue Lo = SplitF64.getValue(0);
       SDValue Hi = SplitF64.getValue(1);
+      
+      // For big-endian, swap the order of Lo and Hi when returning.
+      if (!STI.isLittleEndian())
+        std::swap(Lo, Hi);
+      
       Register RegLo = VA.getLocReg();
       Register RegHi = RVLocs[++i].getLocReg();
 
