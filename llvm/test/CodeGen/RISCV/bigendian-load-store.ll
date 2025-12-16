@@ -407,3 +407,29 @@ define double @bitcast_i64_to_f64(i64 %x) {
   %y = bitcast i64 %x to double
   ret double %y
 }
+
+; Test i64 return value register order (a0=low/a1=high for LE, a0=high/a1=low for BE)
+define i64 @return_i64_const() {
+; RV32LE-LABEL: return_i64_const:
+; RV32LE:       # %bb.0:
+; RV32LE-NEXT:    li a0, 1
+; RV32LE-NEXT:    li a1, 0
+; RV32LE-NEXT:    ret
+;
+; RV32BE-LABEL: return_i64_const:
+; RV32BE:       # %bb.0:
+; RV32BE-NEXT:    li a1, 1
+; RV32BE-NEXT:    li a0, 0
+; RV32BE-NEXT:    ret
+;
+; RV64LE-LABEL: return_i64_const:
+; RV64LE:       # %bb.0:
+; RV64LE-NEXT:    li a0, 1
+; RV64LE-NEXT:    ret
+;
+; RV64BE-LABEL: return_i64_const:
+; RV64BE:       # %bb.0:
+; RV64BE-NEXT:    li a0, 1
+; RV64BE-NEXT:    ret
+  ret i64 1
+}
