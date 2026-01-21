@@ -37,6 +37,16 @@ public:
   // they belongs to an architecture with lldb internal registers.
   virtual uint32_t GetUserRegisterCount() const { return GetRegisterCount(); }
 
+  // Returns the number of register sets for this architecture.
+  // Subclasses should override if they provide register set information.
+  virtual size_t GetRegisterSetCount() const { return 0; }
+
+  // Returns the register set at the given index, or nullptr if not available.
+  // Subclasses should override if they provide register set information.
+  virtual const lldb_private::RegisterSet *GetRegisterSet(size_t set) const {
+    return nullptr;
+  }
+
   const lldb_private::ArchSpec &GetTargetArchitecture() const {
     return m_target_arch;
   }

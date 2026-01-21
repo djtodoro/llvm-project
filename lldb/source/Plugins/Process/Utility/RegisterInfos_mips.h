@@ -36,13 +36,8 @@
                       GPR_OFFSET(reg), eEncodingUint, eFormatHex,              \
                                  {kind1, kind2, kind3, ptrace_##reg##_mips,    \
                                   gpr_##reg##_mips },                          \
-                                  NULL, NULL, NULL, 0                          \
+                                  NULL, NULL, NULL,                            \
   }
-
-const uint8_t dwarf_opcode_mips[] = {
-    llvm::dwarf::DW_OP_regx,  dwarf_sr_mips,          llvm::dwarf::DW_OP_lit1,
-    llvm::dwarf::DW_OP_lit26, llvm::dwarf::DW_OP_shl, llvm::dwarf::DW_OP_and,
-    llvm::dwarf::DW_OP_lit26, llvm::dwarf::DW_OP_shr};
 
 #define DEFINE_FPR(reg, alt, kind1, kind2, kind3)                              \
   {                                                                            \
@@ -50,8 +45,7 @@ const uint8_t dwarf_opcode_mips[] = {
                       FPR_OFFSET(reg), eEncodingIEEE754, eFormatFloat,         \
                                  {kind1, kind2, kind3, ptrace_##reg##_mips,    \
                                   fpr_##reg##_mips },                          \
-                                  NULL, NULL, dwarf_opcode_mips,               \
-                                  sizeof(dwarf_opcode_mips)                    \
+                                  NULL, NULL, NULL,                            \
   }
 
 #define DEFINE_FPR_INFO(reg, alt, kind1, kind2, kind3)                         \
@@ -60,7 +54,7 @@ const uint8_t dwarf_opcode_mips[] = {
                       FPR_OFFSET(reg), eEncodingUint, eFormatHex,              \
                                  {kind1, kind2, kind3, ptrace_##reg##_mips,    \
                                   fpr_##reg##_mips },                          \
-                                  NULL, NULL, NULL, 0                          \
+                                  NULL, NULL, NULL,                            \
   }
 
 #define DEFINE_MSA(reg, alt, kind1, kind2, kind3, kind4)                       \
@@ -69,7 +63,7 @@ const uint8_t dwarf_opcode_mips[] = {
                       MSA_OFFSET(reg), eEncodingVector, eFormatVectorOfUInt8,  \
                                  {kind1, kind2, kind3, kind4,                  \
                                   msa_##reg##_mips },                          \
-                                  NULL, NULL, NULL, 0                          \
+                                  NULL, NULL, NULL,                            \
   }
 
 #define DEFINE_MSA_INFO(reg, alt, kind1, kind2, kind3, kind4)                  \
@@ -78,7 +72,7 @@ const uint8_t dwarf_opcode_mips[] = {
                       MSA_OFFSET(reg), eEncodingUint, eFormatHex,              \
                                  {kind1, kind2, kind3, kind4,                  \
                                   msa_##reg##_mips },                          \
-                                  NULL, NULL, NULL, 0                          \
+                                  NULL, NULL, NULL,                            \
   }
 
 // RegisterKind: EH_Frame, DWARF, Generic, Procss Plugin, LLDB

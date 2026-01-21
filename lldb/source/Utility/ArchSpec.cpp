@@ -1315,7 +1315,7 @@ static bool cores_match(const ArchSpec::Core core1, const ArchSpec::Core core2,
       if (core2 >= ArchSpec::kCore_mips32el_first &&
           core2 <= ArchSpec::kCore_mips32el_last)
         return true;
-      try_inverse = true;
+      try_inverse = false;
     }
     break;
 

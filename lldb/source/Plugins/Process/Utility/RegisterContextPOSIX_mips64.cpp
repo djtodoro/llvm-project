@@ -21,7 +21,6 @@
 #include "llvm/Support/Compiler.h"
 
 #include "RegisterContextPOSIX_mips64.h"
-#include "RegisterContextFreeBSD_mips64.h"
 
 using namespace lldb_private;
 using namespace lldb;
@@ -98,15 +97,11 @@ RegisterContextPOSIX_mips64::GetRegisterInfoAtIndex(size_t reg) {
 }
 
 size_t RegisterContextPOSIX_mips64::GetRegisterSetCount() {
-  const auto *context = static_cast<const RegisterContextFreeBSD_mips64 *>(
-      m_register_info_up.get());
-  return context->GetRegisterSetCount();
+  return m_register_info_up->GetRegisterSetCount();
 }
 
 const RegisterSet *RegisterContextPOSIX_mips64::GetRegisterSet(size_t set) {
-  const auto *context = static_cast<const RegisterContextFreeBSD_mips64 *>(
-      m_register_info_up.get());
-  return context->GetRegisterSet(set);
+  return m_register_info_up->GetRegisterSet(set);
 }
 
 const char *RegisterContextPOSIX_mips64::GetRegisterName(unsigned reg) {

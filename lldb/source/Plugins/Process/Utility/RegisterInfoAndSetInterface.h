@@ -24,10 +24,10 @@ public:
 
   virtual size_t GetFPRSize() const = 0;
 
-  virtual const lldb_private::RegisterSet *
-  GetRegisterSet(size_t reg_set) const = 0;
+  const lldb_private::RegisterSet *
+  GetRegisterSet(size_t reg_set) const override = 0;
 
-  virtual size_t GetRegisterSetCount() const = 0;
+  size_t GetRegisterSetCount() const override = 0;
 
   virtual size_t GetRegisterSetFromRegisterIndex(uint32_t reg_index) const = 0;
 };
