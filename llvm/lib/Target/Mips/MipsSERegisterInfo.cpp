@@ -199,6 +199,16 @@ void MipsSERegisterInfo::eliminateFI(MachineBasicBlock::iterator II,
   Offset = SPOffset + (int64_t)StackSize;
   Offset += MI.getOperand(OpNo + 1).getImm();
 
+  // If using FP-relative addressing and FP points to the saved FP slot
+  // (not to SP), adjust the offset accordingly.
+  // FP = SP + FPSaveOffset, so Offset_from_FP = Offset_from_SP - FPSaveOffset
+  if (FrameReg == ABI.GetFramePtr()) {
+    int64_t FPSaveOffset = MipsFI->getFPSaveOffset();
+    if (FPSaveOffset != 0) {
+      Offset -= FPSaveOffset;
+    }
+  }
+
   LLVM_DEBUG(errs() << "Offset     : " << Offset << "\n"
                     << "<--------->\n");
 

@@ -83,6 +83,12 @@ public:
 
   int getMoveF64ViaSpillFI(MachineFunction &MF, const TargetRegisterClass *RC);
 
+  /// FPSaveOffset - The offset from SP where FP was saved.
+  /// When using the new frame pointer semantics (FP points to saved FP slot),
+  /// this is used to adjust offsets when using FP-relative addressing.
+  int64_t getFPSaveOffset() const { return FPSaveOffset; }
+  void setFPSaveOffset(int64_t Offset) { FPSaveOffset = Offset; }
+
   std::map<const char *, const Mips16HardFloatInfo::FuncSignature *>
   StubsNeeded;
 
@@ -126,6 +132,11 @@ private:
   /// FrameIndex for expanding BuildPairF64 nodes to spill and reload when the
   /// O32 FPXX ABI is enabled. -1 is used to denote invalid index.
   int MoveF64ViaSpillFI = -1;
+
+  /// FPSaveOffset - The offset from SP where FP was saved. This is used
+  /// when FP points to the saved FP slot (like ARM) instead of pointing to SP.
+  /// When this is non-zero, FP = SP + FPSaveOffset at function entry.
+  int64_t FPSaveOffset = 0;
 };
 
 } // end namespace llvm

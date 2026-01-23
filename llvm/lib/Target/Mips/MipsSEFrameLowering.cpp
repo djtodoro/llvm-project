@@ -491,13 +491,39 @@ void MipsSEFrameLowering::emitPrologue(MachineFunction &MF,
     }
   }
 
-  // if framepointer enabled, set it to point to the stack pointer.
+  // if framepointer enabled, set it to point to where the old FP was saved.
+  // This makes the frame pointer point to the saved FP slot, so that
+  // *FP == caller's FP (like ARM does), enabling proper frame chain walking.
   if (hasFP(MF)) {
-    // Insert instruction "move $fp, $sp" at this location.
-    BuildMI(MBB, MBBI, dl, TII.get(MOVE), FP).addReg(SP).addReg(ZERO)
-      .setMIFlag(MachineInstr::FrameSetup);
+    // Find the offset where FP was saved in the callee-saved info.
+    int64_t FPSaveOffset = 0;
+    bool FoundFP = false;
+    for (const CalleeSavedInfo &I : CSI) {
+      if (I.getReg() == FP) {
+        FPSaveOffset = MFI.getObjectOffset(I.getFrameIdx()) + StackSize;
+        FoundFP = true;
+        break;
+      }
+    }
 
-    CFIBuilder.buildDefCFARegister(FP);
+    // Store FPSaveOffset for later use in frame index elimination.
+    MipsFI->setFPSaveOffset(FPSaveOffset);
+
+    if (FoundFP && FPSaveOffset != 0) {
+      // Insert instruction "addiu $fp, $sp, FPSaveOffset" to make FP point
+      // to where the old FP was saved, enabling proper frame chain walking.
+      BuildMI(MBB, MBBI, dl, TII.get(ADDiu), FP).addReg(SP).addImm(FPSaveOffset)
+        .setMIFlag(MachineInstr::FrameSetup);
+      // CFA = FP + (StackSize - FPSaveOffset) since FP = SP + FPSaveOffset
+      // and CFA = SP + StackSize = FP - FPSaveOffset + StackSize
+      CFIBuilder.buildDefCFA(FP, StackSize - FPSaveOffset);
+    } else {
+      // FP is saved at offset 0 or not found - "move $fp, $sp" is correct.
+      // When FP is at SP+0, *FP = caller's FP is satisfied by FP = SP.
+      BuildMI(MBB, MBBI, dl, TII.get(MOVE), FP).addReg(SP).addReg(ZERO)
+        .setMIFlag(MachineInstr::FrameSetup);
+      CFIBuilder.buildDefCFARegister(FP);
+    }
 
     if (RegInfo.hasStackRealignment(MF)) {
       // addiu $Reg, $zero, -MaxAlignment
@@ -674,8 +700,26 @@ void MipsSEFrameLowering::emitEpilogue(MachineFunction &MF,
     for (unsigned i = 0; i < MFI.getCalleeSavedInfo().size(); ++i)
       --I;
 
-    // Insert instruction "move $sp, $fp" at this location.
-    BuildMI(MBB, I, DL, TII.get(MOVE), SP).addReg(FP).addReg(ZERO);
+    // Find the offset where FP was saved (FP now points to this location).
+    const std::vector<CalleeSavedInfo> &CSI = MFI.getCalleeSavedInfo();
+    uint64_t StackSize = MFI.getStackSize();
+    int64_t FPSaveOffset = 0;
+    for (const CalleeSavedInfo &Info : CSI) {
+      if (Info.getReg() == FP) {
+        FPSaveOffset = MFI.getObjectOffset(Info.getFrameIdx()) + StackSize;
+        break;
+      }
+    }
+
+    unsigned ADDiu = ABI.GetPtrAddiuOp();
+    if (FPSaveOffset != 0) {
+      // Insert instruction "addiu $sp, $fp, -FPSaveOffset" to restore SP.
+      // Since FP = original_SP + FPSaveOffset, we need SP = FP - FPSaveOffset.
+      BuildMI(MBB, I, DL, TII.get(ADDiu), SP).addReg(FP).addImm(-FPSaveOffset);
+    } else {
+      // Fallback: Insert instruction "move $sp, $fp" at this location.
+      BuildMI(MBB, I, DL, TII.get(MOVE), SP).addReg(FP).addReg(ZERO);
+    }
   }
 
   if (MipsFI->callsEhReturn()) {
@@ -742,6 +786,7 @@ StackOffset
 MipsSEFrameLowering::getFrameIndexReference(const MachineFunction &MF, int FI,
                                             Register &FrameReg) const {
   const MachineFrameInfo &MFI = MF.getFrameInfo();
+  const MipsFunctionInfo *MipsFI = MF.getInfo<MipsFunctionInfo>();
   MipsABIInfo ABI = STI.getABI();
 
   if (MFI.isFixedObjectIndex(FI))
@@ -749,9 +794,19 @@ MipsSEFrameLowering::getFrameIndexReference(const MachineFunction &MF, int FI,
   else
     FrameReg = hasBP(MF) ? ABI.GetBasePtr() : ABI.GetStackPtr();
 
-  return StackOffset::getFixed(MFI.getObjectOffset(FI) + MFI.getStackSize() -
-                               getOffsetOfLocalArea() +
-                               MFI.getOffsetAdjustment());
+  int64_t Offset = MFI.getObjectOffset(FI) + MFI.getStackSize() -
+                   getOffsetOfLocalArea() + MFI.getOffsetAdjustment();
+
+  // If using FP-relative addressing and FP points to the saved FP slot
+  // (not to SP), adjust the offset accordingly.
+  if (FrameReg == ABI.GetFramePtr()) {
+    int64_t FPSaveOffset = MipsFI->getFPSaveOffset();
+    if (FPSaveOffset != 0) {
+      Offset -= FPSaveOffset;
+    }
+  }
+
+  return StackOffset::getFixed(Offset);
 }
 
 bool MipsSEFrameLowering::spillCalleeSavedRegisters(
