@@ -70,16 +70,16 @@ define double @test_f64_call_with_fadd(double %a, double %b) {
 ; RV32BE-NEXT:    .cfi_def_cfa_offset 16
 ; RV32BE-NEXT:    sw ra, 12(sp) # 4-byte Folded Spill
 ; RV32BE-NEXT:    .cfi_offset ra, -4
-; RV32BE-NEXT:    sw a2, 0(sp)
-; RV32BE-NEXT:    sw a3, 4(sp)
+; RV32BE-NEXT:    sw a3, 0(sp)
+; RV32BE-NEXT:    sw a2, 4(sp)
 ; RV32BE-NEXT:    fld fa5, 0(sp)
-; RV32BE-NEXT:    sw a0, 0(sp)
-; RV32BE-NEXT:    sw a1, 4(sp)
+; RV32BE-NEXT:    sw a1, 0(sp)
+; RV32BE-NEXT:    sw a0, 4(sp)
 ; RV32BE-NEXT:    fld fa4, 0(sp)
 ; RV32BE-NEXT:    fadd.d fa5, fa4, fa5
 ; RV32BE-NEXT:    fsd fa5, 0(sp)
-; RV32BE-NEXT:    lw a0, 0(sp)
-; RV32BE-NEXT:    lw a1, 4(sp)
+; RV32BE-NEXT:    lw a1, 0(sp)
+; RV32BE-NEXT:    lw a0, 4(sp)
 ; RV32BE-NEXT:    mv a2, a0
 ; RV32BE-NEXT:    mv a3, a1
 ; RV32BE-NEXT:    call external_func

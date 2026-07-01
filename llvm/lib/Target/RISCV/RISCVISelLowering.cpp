@@ -23625,9 +23625,12 @@ void RISCVTargetLowering::analyzeInputArgs(
   for (const auto &[Idx, In] : enumerate(Ins)) {
     MVT ArgVT = In.VT;
     ISD::ArgFlagsTy ArgFlags = In.Flags;
+    Type *OrigTy = In.OrigTy;
+    if (!IsRet && In.isOrigArg())
+      OrigTy = MF.getFunction().getArg(In.getOrigArgIndex())->getType();
 
     if (Fn(Idx, ArgVT, ArgVT, CCValAssign::Full, ArgFlags, CCInfo, IsRet,
-           In.OrigTy)) {
+           In.ArgVT, OrigTy)) {
       LLVM_DEBUG(dbgs() << "InputArg #" << Idx << " has unhandled type "
                         << ArgVT << '\n');
       llvm_unreachable(nullptr);
@@ -23642,14 +23645,60 @@ void RISCVTargetLowering::analyzeOutputArgs(
   for (const auto &[Idx, Out] : enumerate(Outs)) {
     MVT ArgVT = Out.VT;
     ISD::ArgFlagsTy ArgFlags = Out.Flags;
+    Type *OrigTy = Out.OrigTy;
+    if (!IsRet && CLI && Out.OrigArgIndex < CLI->getArgs().size())
+      OrigTy = CLI->getArgs()[Out.OrigArgIndex].OrigTy;
 
     if (Fn(Idx, ArgVT, ArgVT, CCValAssign::Full, ArgFlags, CCInfo, IsRet,
-           Out.OrigTy)) {
+           Out.ArgVT, OrigTy)) {
       LLVM_DEBUG(dbgs() << "OutputArg #" << Idx << " has unhandled type "
                         << ArgVT << "\n");
       llvm_unreachable(nullptr);
     }
   }
+}
+
+static bool is2XLenScalarType(const Type *Ty, const DataLayout &DL,
+                              unsigned XLen) {
+  if (!Ty)
+    return false;
+
+  if (!Ty->isIntegerTy() && !Ty->isFloatingPointTy() && !Ty->isPointerTy())
+    return false;
+
+  return DL.getTypeAllocSize(const_cast<Type *>(Ty)) == (2 * XLen) / 8;
+}
+
+template <typename ArgT>
+static void setRetOrigTy(SmallVectorImpl<ArgT> &Args, const Type *RetTy) {
+  if (!RetTy)
+    return;
+
+  Type *NonConstRetTy = const_cast<Type *>(RetTy);
+  for (ArgT &Arg : Args)
+    if (!Arg.Flags.isSwiftError())
+      Arg.OrigTy = NonConstRetTy;
+}
+
+template <typename ArgT>
+static void mark2XLenScalarRetSplit(SmallVectorImpl<ArgT> &Args,
+                                    const Type *RetTy, const DataLayout &DL,
+                                    unsigned XLen) {
+  unsigned XLenInBytes = XLen / 8;
+  unsigned TwoXLenInBytes = (2 * XLen) / 8;
+
+  if (!is2XLenScalarType(RetTy, DL, XLen) || Args.size() < 2)
+    return;
+
+  if (Args[0].VT.getStoreSize() != XLenInBytes ||
+      Args[1].VT.getStoreSize() != XLenInBytes ||
+      Args[0].ArgVT.getStoreSize() != TwoXLenInBytes ||
+      Args[1].ArgVT.getStoreSize() != TwoXLenInBytes)
+    return;
+
+  Args[0].Flags.setSplit();
+  Args[1].Flags.setOrigAlign(Align(1));
+  Args[1].Flags.setSplitEnd();
 }
 
 // Convert Val to a ValVT. Should not be called for CCValAssign::Indirect
@@ -23794,11 +23843,6 @@ static SDValue unpackF64OnRV32DSoftABI(SelectionDAG &DAG, SDValue Chain,
     RegInfo.addLiveIn(HiVA.getLocReg(), HiVReg);
     Hi = DAG.getCopyFromReg(Chain, DL, HiVReg, MVT::i32);
   }
-
-  // For big-endian, swap the order of Lo and Hi when building the pair.
-  const RISCVSubtarget &Subtarget = DAG.getSubtarget<RISCVSubtarget>();
-  if (!Subtarget.isLittleEndian())
-    std::swap(Lo, Hi);
 
   return DAG.getNode(RISCVISD::BuildPairF64, DL, MVT::f64, Lo, Hi);
 }
@@ -24171,8 +24215,9 @@ SDValue RISCVTargetLowering::LowerCall(CallLoweringInfo &CLI,
       SDValue Lo = SplitF64.getValue(0);
       SDValue Hi = SplitF64.getValue(1);
 
-      // For big-endian, swap the order of Lo and Hi when passing.
-      if (!Subtarget.isLittleEndian())
+      // Anonymous variadic arguments use memory-layout ordering so that
+      // spilling argument registers preserves the va_arg stack layout.
+      if (!Subtarget.isLittleEndian() && Flags.isVarArg())
         std::swap(Lo, Hi);
 
       Register RegLo = VA.getLocReg();
@@ -24384,7 +24429,13 @@ SDValue RISCVTargetLowering::LowerCall(CallLoweringInfo &CLI,
   // Assign locations to each value returned by this call.
   SmallVector<CCValAssign, 16> RVLocs;
   CCState RetCCInfo(CallConv, IsVarArg, MF, RVLocs, *DAG.getContext());
-  analyzeInputArgs(MF, RetCCInfo, Ins, /*IsRet=*/true, CC_RISCV);
+  SmallVector<ISD::InputArg, 4> RetIns(Ins.begin(), Ins.end());
+  if (!Subtarget.isLittleEndian()) {
+    setRetOrigTy(RetIns, CLI.OrigRetTy);
+    mark2XLenScalarRetSplit(RetIns, CLI.OrigRetTy, DAG.getDataLayout(),
+                            Subtarget.getXLen());
+  }
+  analyzeInputArgs(MF, RetCCInfo, RetIns, /*IsRet=*/true, CC_RISCV);
 
   // Copy all of the result registers out of their specified physreg.
   for (unsigned i = 0, e = RVLocs.size(); i != e; ++i) {
@@ -24403,11 +24454,8 @@ SDValue RISCVTargetLowering::LowerCall(CallLoweringInfo &CLI,
       Chain = RetValue2.getValue(1);
       Glue = RetValue2.getValue(2);
 
-      // For big-endian, swap the order when building the pair.
       SDValue Lo = RetValue;
       SDValue Hi = RetValue2;
-      if (!Subtarget.isLittleEndian())
-        std::swap(Lo, Hi);
 
       RetValue = DAG.getNode(RISCVISD::BuildPairF64, DL, MVT::f64, Lo, Hi);
     } else
@@ -24425,12 +24473,18 @@ bool RISCVTargetLowering::CanLowerReturn(
     const Type *RetTy) const {
   SmallVector<CCValAssign, 16> RVLocs;
   CCState CCInfo(CallConv, IsVarArg, MF, RVLocs, Context);
+  SmallVector<ISD::OutputArg, 4> RetOuts(Outs.begin(), Outs.end());
+  if (!Subtarget.isLittleEndian()) {
+    setRetOrigTy(RetOuts, RetTy);
+    mark2XLenScalarRetSplit(RetOuts, RetTy, MF.getDataLayout(),
+                            Subtarget.getXLen());
+  }
 
-  for (unsigned i = 0, e = Outs.size(); i != e; ++i) {
-    MVT VT = Outs[i].VT;
-    ISD::ArgFlagsTy ArgFlags = Outs[i].Flags;
+  for (unsigned i = 0, e = RetOuts.size(); i != e; ++i) {
+    MVT VT = RetOuts[i].VT;
+    ISD::ArgFlagsTy ArgFlags = RetOuts[i].Flags;
     if (CC_RISCV(i, VT, VT, CCValAssign::Full, ArgFlags, CCInfo,
-                 /*IsRet=*/true, Outs[i].OrigTy))
+                 /*IsRet=*/true, RetOuts[i].ArgVT, RetOuts[i].OrigTy))
       return false;
   }
   return true;
@@ -24451,7 +24505,15 @@ RISCVTargetLowering::LowerReturn(SDValue Chain, CallingConv::ID CallConv,
   CCState CCInfo(CallConv, IsVarArg, DAG.getMachineFunction(), RVLocs,
                  *DAG.getContext());
 
-  analyzeOutputArgs(DAG.getMachineFunction(), CCInfo, Outs, /*IsRet=*/true,
+  SmallVector<ISD::OutputArg, 4> RetOuts(Outs.begin(), Outs.end());
+  if (!Subtarget.isLittleEndian()) {
+    const Function &Func = DAG.getMachineFunction().getFunction();
+    setRetOrigTy(RetOuts, Func.getReturnType());
+    mark2XLenScalarRetSplit(RetOuts, Func.getReturnType(), DAG.getDataLayout(),
+                            Subtarget.getXLen());
+  }
+
+  analyzeOutputArgs(DAG.getMachineFunction(), CCInfo, RetOuts, /*IsRet=*/true,
                     nullptr, CC_RISCV);
 
   if (CallConv == CallingConv::GHC && !RVLocs.empty())
@@ -24474,10 +24536,6 @@ RISCVTargetLowering::LowerReturn(SDValue Chain, CallingConv::ID CallConv,
                                      DAG.getVTList(MVT::i32, MVT::i32), Val);
       SDValue Lo = SplitF64.getValue(0);
       SDValue Hi = SplitF64.getValue(1);
-
-      // For big-endian, swap the order of Lo and Hi when returning.
-      if (!Subtarget.isLittleEndian())
-        std::swap(Lo, Hi);
 
       Register RegLo = VA.getLocReg();
       Register RegHi = RVLocs[++i].getLocReg();

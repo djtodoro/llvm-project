@@ -45,7 +45,7 @@ public:
                  CCValAssign::LocInfo LocInfo,
                  const CallLowering::ArgInfo &Info, ISD::ArgFlagsTy Flags,
                  CCState &State) override {
-    if (RISCVAssignFn(ValNo, ValVT, LocVT, LocInfo, Flags, State, IsRet,
+    if (RISCVAssignFn(ValNo, ValVT, LocVT, LocInfo, Flags, State, IsRet, OrigVT,
                       Info.Ty))
       return true;
 
@@ -196,7 +196,7 @@ public:
     if (LocVT.isScalableVector())
       MF.getInfo<RISCVMachineFunctionInfo>()->setIsVectorCall();
 
-    if (RISCVAssignFn(ValNo, ValVT, LocVT, LocInfo, Flags, State, IsRet,
+    if (RISCVAssignFn(ValNo, ValVT, LocVT, LocInfo, Flags, State, IsRet, OrigVT,
                       Info.Ty))
       return true;
 
@@ -442,7 +442,7 @@ bool RISCVCallLowering::canLowerReturn(MachineFunction &MF,
   for (unsigned I = 0, E = Outs.size(); I < E; ++I) {
     MVT VT = MVT::getVT(Outs[I].Ty);
     if (CC_RISCV(I, VT, VT, CCValAssign::Full, Outs[I].Flags[0], CCInfo,
-                 /*isRet=*/true, nullptr))
+                 /*isRet=*/true, EVT(VT), Outs[I].Ty))
       return false;
   }
   return true;

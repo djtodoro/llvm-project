@@ -232,22 +232,38 @@ static ArrayRef<MCPhysReg> getFastCCArgGPRF32s(const RISCVABI::ABI ABI) {
   return ArrayRef(FastCCIGPRs);
 }
 
+static bool is2XLenScalar(EVT OrigVT, Type *OrigTy, const DataLayout &DL,
+                          unsigned XLen) {
+  unsigned TwoXLenInBytes = (2 * XLen) / 8;
+
+  if (OrigTy) {
+    if (!OrigTy->isIntegerTy() && !OrigTy->isFloatingPointTy() &&
+        !OrigTy->isPointerTy())
+      return false;
+
+    return DL.getTypeAllocSize(OrigTy) == TwoXLenInBytes;
+  }
+
+  if (!OrigVT.isInteger() && !OrigVT.isFloatingPoint())
+    return false;
+
+  return OrigVT.getStoreSize() == TwoXLenInBytes;
+}
+
 // Pass a 2*XLEN argument that has been split into two XLEN values through
 // registers or the stack as necessary.
 static bool CC_RISCVAssign2XLen(unsigned XLen, CCState &State, CCValAssign VA1,
                                 ISD::ArgFlagsTy ArgFlags1, unsigned ValNo2,
                                 MVT ValVT2, MVT LocVT2,
-                                ISD::ArgFlagsTy ArgFlags2, bool EABI) {
+                                ISD::ArgFlagsTy ArgFlags2, bool EABI,
+                                bool UseSignificanceOrder) {
   unsigned XLenInBytes = XLen / 8;
   const RISCVSubtarget &STI =
       State.getMachineFunction().getSubtarget<RISCVSubtarget>();
   ArrayRef<MCPhysReg> ArgGPRs = RISCV::getArgGPRs(STI.getTargetABI());
 
-  if (MCRegister Reg = State.AllocateReg(ArgGPRs)) {
-    // At least one half can be passed via register.
-    State.addLoc(CCValAssign::getReg(VA1.getValNo(), VA1.getValVT(), Reg,
-                                     VA1.getLocVT(), CCValAssign::Full));
-  } else {
+  MCRegister Reg = State.AllocateReg(ArgGPRs);
+  if (!Reg) {
     // Both halves must be passed on the stack, with proper alignment.
     // TODO: To be compatible with GCC's behaviors, we force them to have 4-byte
     // alignment. This behavior may be changed when RV32E/ILP32E is ratified.
@@ -264,10 +280,36 @@ static bool CC_RISCVAssign2XLen(unsigned XLen, CCState &State, CCValAssign VA1,
     return false;
   }
 
-  if (MCRegister Reg = State.AllocateReg(ArgGPRs)) {
+  MCRegister Reg2 = State.AllocateReg(ArgGPRs);
+  if (UseSignificanceOrder) {
+    // On big-endian targets, legal splitting presents the high-order XLEN bits
+    // first.  Named scalar arguments and return values still use
+    // significance-based ordering, so the low-order XLEN bits go in the
+    // lower-numbered register when one is available.
+    if (Reg2) {
+      State.addLoc(CCValAssign::getReg(VA1.getValNo(), VA1.getValVT(), Reg2,
+                                       VA1.getLocVT(), CCValAssign::Full));
+      State.addLoc(
+          CCValAssign::getReg(ValNo2, ValVT2, Reg, LocVT2, CCValAssign::Full));
+    } else {
+      State.addLoc(CCValAssign::getMem(
+          VA1.getValNo(), VA1.getValVT(),
+          State.AllocateStack(XLenInBytes, Align(XLenInBytes)), VA1.getLocVT(),
+          CCValAssign::Full));
+      State.addLoc(
+          CCValAssign::getReg(ValNo2, ValVT2, Reg, LocVT2, CCValAssign::Full));
+    }
+    return false;
+  }
+
+  // At least one half can be passed via register.
+  State.addLoc(CCValAssign::getReg(VA1.getValNo(), VA1.getValVT(), Reg,
+                                   VA1.getLocVT(), CCValAssign::Full));
+
+  if (Reg2) {
     // The second half can also be passed via register.
     State.addLoc(
-        CCValAssign::getReg(ValNo2, ValVT2, Reg, LocVT2, CCValAssign::Full));
+        CCValAssign::getReg(ValNo2, ValVT2, Reg2, LocVT2, CCValAssign::Full));
   } else {
     // The second half is passed via the stack, without additional alignment.
     State.addLoc(CCValAssign::getMem(
@@ -324,7 +366,7 @@ static MCRegister allocateRVVReg(MVT ValVT, unsigned ValNo, CCState &State,
 // Implements the RISC-V calling convention. Returns true upon failure.
 bool llvm::CC_RISCV(unsigned ValNo, MVT ValVT, MVT LocVT,
                     CCValAssign::LocInfo LocInfo, ISD::ArgFlagsTy ArgFlags,
-                    CCState &State, bool IsRet, Type *OrigTy) {
+                    CCState &State, bool IsRet, EVT OrigVT, Type *OrigTy) {
   const MachineFunction &MF = State.getMachineFunction();
   const DataLayout &DL = MF.getDataLayout();
   const RISCVSubtarget &Subtarget = MF.getSubtarget<RISCVSubtarget>();
@@ -522,9 +564,13 @@ bool llvm::CC_RISCV(unsigned ValNo, MVT ValVT, MVT LocVT,
     ISD::ArgFlagsTy AF = PendingArgFlags[0];
     PendingLocs.clear();
     PendingArgFlags.clear();
+    bool UseSignificanceOrder = !Subtarget.isLittleEndian() &&
+                                !ArgFlags.isVarArg() &&
+                                is2XLenScalar(OrigVT, OrigTy, DL, XLen);
     return CC_RISCVAssign2XLen(
         XLen, State, VA, AF, ValNo, ValVT, LocVT, ArgFlags,
-        ABI == RISCVABI::ABI_ILP32E || ABI == RISCVABI::ABI_LP64E);
+        ABI == RISCVABI::ABI_ILP32E || ABI == RISCVABI::ABI_LP64E,
+        UseSignificanceOrder);
   }
 
   // Split arguments might be passed indirectly, so keep track of the pending
@@ -626,7 +672,7 @@ bool llvm::CC_RISCV(unsigned ValNo, MVT ValVT, MVT LocVT,
 bool llvm::CC_RISCV_FastCC(unsigned ValNo, MVT ValVT, MVT LocVT,
                            CCValAssign::LocInfo LocInfo,
                            ISD::ArgFlagsTy ArgFlags, CCState &State, bool IsRet,
-                           Type *OrigTy) {
+                           EVT OrigVT, Type *OrigTy) {
   const MachineFunction &MF = State.getMachineFunction();
   const RISCVSubtarget &Subtarget = MF.getSubtarget<RISCVSubtarget>();
   const RISCVTargetLowering &TLI = *Subtarget.getTargetLowering();

@@ -160,9 +160,8 @@ define i64 @load_i64(ptr %p) {
 ;
 ; RV32BE-LABEL: load_i64:
 ; RV32BE:       # %bb.0:
-; RV32BE-NEXT:    lw a2, 0(a0)
-; RV32BE-NEXT:    lw a1, 4(a0)
-; RV32BE-NEXT:    mv a0, a2
+; RV32BE-NEXT:    lw a1, 0(a0)
+; RV32BE-NEXT:    lw a0, 4(a0)
 ; RV32BE-NEXT:    ret
 ;
 ; RV64LE-LABEL: load_i64:
@@ -187,8 +186,8 @@ define void @store_i64(ptr %p, i64 %v) {
 ;
 ; RV32BE-LABEL: store_i64:
 ; RV32BE:       # %bb.0:
-; RV32BE-NEXT:    sw a1, 0(a0)
-; RV32BE-NEXT:    sw a2, 4(a0)
+; RV32BE-NEXT:    sw a2, 0(a0)
+; RV32BE-NEXT:    sw a1, 4(a0)
 ; RV32BE-NEXT:    ret
 ;
 ; RV64LE-LABEL: store_i64:
@@ -263,9 +262,8 @@ define double @load_double(ptr %p) {
 ;
 ; RV32BE-LABEL: load_double:
 ; RV32BE:       # %bb.0:
-; RV32BE-NEXT:    lw a2, 0(a0)
-; RV32BE-NEXT:    lw a1, 4(a0)
-; RV32BE-NEXT:    mv a0, a2
+; RV32BE-NEXT:    lw a1, 0(a0)
+; RV32BE-NEXT:    lw a0, 4(a0)
 ; RV32BE-NEXT:    ret
 ;
 ; RV64LE-LABEL: load_double:
@@ -290,8 +288,8 @@ define void @store_double(ptr %p, double %v) {
 ;
 ; RV32BE-LABEL: store_double:
 ; RV32BE:       # %bb.0:
-; RV32BE-NEXT:    sw a1, 0(a0)
-; RV32BE-NEXT:    sw a2, 4(a0)
+; RV32BE-NEXT:    sw a2, 0(a0)
+; RV32BE-NEXT:    sw a1, 4(a0)
 ; RV32BE-NEXT:    ret
 ;
 ; RV64LE-LABEL: store_double:
@@ -408,7 +406,7 @@ define double @bitcast_i64_to_f64(i64 %x) {
   ret double %y
 }
 
-; Test i64 return value register order (a0=low/a1=high for LE, a0=high/a1=low for BE)
+; Test i64 return value register order (a0=low/a1=high for both LE and BE).
 define i64 @return_i64_const() {
 ; RV32LE-LABEL: return_i64_const:
 ; RV32LE:       # %bb.0:
@@ -418,8 +416,8 @@ define i64 @return_i64_const() {
 ;
 ; RV32BE-LABEL: return_i64_const:
 ; RV32BE:       # %bb.0:
-; RV32BE-NEXT:    li a1, 1
-; RV32BE-NEXT:    li a0, 0
+; RV32BE-NEXT:    li a0, 1
+; RV32BE-NEXT:    li a1, 0
 ; RV32BE-NEXT:    ret
 ;
 ; RV64LE-LABEL: return_i64_const:
